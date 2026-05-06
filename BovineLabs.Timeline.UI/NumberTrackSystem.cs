@@ -38,8 +38,6 @@ namespace BovineLabs.Timeline.UI
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            state.Dependency.Complete();
-
             var isVisible = false;
             var currentNumber = 0;
 
