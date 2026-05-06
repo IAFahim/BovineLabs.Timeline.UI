@@ -10,12 +10,12 @@ namespace BovineLabs.Timeline.UI.Authoring
     public class NumberClip : DOTSClip, ITimelineClipAsset
     {
         public int Number;
+        public override double duration => 1;
         public ClipCaps clipCaps => ClipCaps.None;
 
         public override void Bake(Entity clipEntity, BakingContext context)
         {
-            // Add our component with the authored number to the clip entity
-            context.Baker.AddComponent(clipEntity, new NumberComponent { Value = this.Number });
+            context.Baker.AddComponent(clipEntity, new NumberComponent { Value = Number });
             base.Bake(clipEntity, context);
         }
     }

@@ -1,13 +1,13 @@
-namespace BovineLabs.Timeline.UI.Data
-{
-    using BovineLabs.Anchor;
-    using Unity.Properties;
+using BovineLabs.Anchor;
+using Unity.Properties;
 
+namespace BovineLabs.Timeline.UI.Data.ViewModel
+{
     [IsService]
     public partial class NumberViewModel : SystemObservableObject<NumberViewModel.Data>
     {
-        [CreateProperty(ReadOnly = true)] public int Number => this.Value.Number;
-        [CreateProperty(ReadOnly = true)] public bool IsVisible => this.Value.IsVisible;
+        [CreateProperty(ReadOnly = true)] public int Number => Value.Number;
+        [CreateProperty(ReadOnly = true)] public bool IsVisible => Value.IsVisible;
 
         public partial struct Data
         {
