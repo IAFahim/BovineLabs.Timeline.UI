@@ -34,7 +34,6 @@ namespace BovineLabs.Timeline.UI
         public void OnStartRunning(ref SystemState state) => _uiHelper.Bind();
         public void OnStopRunning(ref SystemState state) => _uiHelper.Unbind();
 
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             float dt = SystemAPI.Time.DeltaTime;
