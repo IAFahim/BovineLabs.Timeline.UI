@@ -26,15 +26,7 @@
     "dots",
     "timeline",
     "ecs",
-    "ui",
-    "unity ui"
-  ],
-  "samples": [
-    {
-      "displayName": "UI",
-      "description": "UI timeline sample content for validating UI tracks.",
-      "path": "Sample~/UI"
-    }
+    "ui"
   ],
   "documentationUrl": "Documentation~/com.bovinelabs.timeline.ui.md",
   "changelogUrl": "CHANGELOG.md",
