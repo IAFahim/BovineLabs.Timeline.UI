@@ -14,11 +14,12 @@ namespace BovineLabs.Timeline.UI.Tests
 
         private void OnEnable()
         {
-            this.rows = new NativeArray<RowsViewModel.Data.Row>(3, Allocator.Persistent)
+            this.rows = new NativeArray<RowsViewModel.Data.Row>(4, Allocator.Persistent)
             {
                 [0] = new RowsViewModel.Data.Row { RawLabel = "Idle", RawValue = 0 },
                 [1] = new RowsViewModel.Data.Row { RawLabel = "Run", RawValue = 1 },
                 [2] = new RowsViewModel.Data.Row { RawLabel = "Attack", RawValue = 2 },
+                [3] = new RowsViewModel.Data.Row { RawLabel = "You", RawValue = 2 },
             };
 
 #if UNITY_6000_5_OR_NEWER
