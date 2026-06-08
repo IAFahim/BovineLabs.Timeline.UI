@@ -54,14 +54,12 @@ namespace BovineLabs.Timeline.UI
             if (root == null || !Ready(root)) return;
             Exit();
             Enter(root);
-
             if (Animated) Tick();
         }
 
         protected sealed override void OnDestroy()
         {
             foreach (var inverse in outstanding.Values) Revert(inverse);
-
             outstanding.Clear();
         }
 
@@ -72,16 +70,8 @@ namespace BovineLabs.Timeline.UI
 
             foreach (var entity in entities)
             {
-                if (Live(entity))
-                {
-                    continue;
-                }
-
-                if (outstanding.Remove(entity, out var inverse))
-                {
-                    Revert(inverse);
-                }
-
+                if (Live(entity)) continue;
+                if (outstanding.Remove(entity, out var inverse)) Revert(inverse);
                 ecb.RemoveComponent<TCleanup>(entity);
             }
 
@@ -99,7 +89,6 @@ namespace BovineLabs.Timeline.UI
                 var d = data[i];
                 if (TryApply(root, entities[i], in d, out var inverse)) outstanding[entities[i]] = inverse;
                 else BLGlobalLogger.LogWarningString($"{GetType().Name}: unresolved target for {entities[i].ToFixedString()}.");
-
                 ecb.AddComponent<TCleanup>(entities[i]);
             }
 

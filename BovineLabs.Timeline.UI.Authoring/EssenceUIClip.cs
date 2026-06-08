@@ -12,7 +12,7 @@ namespace BovineLabs.Timeline.UI.Authoring
     public struct EventUIConfig
     {
         public ConditionEventObject Event;
-        public float DisplayDuration; // How long to buffer the event on screen
+        public float DisplayDuration;
     }
 
     [Serializable]
@@ -29,24 +29,53 @@ namespace BovineLabs.Timeline.UI.Authoring
         {
             var statBuffer = context.Baker.AddBuffer<ClipStat>(clipEntity);
             if (Stats != null)
-                foreach (var s in Stats)
-                    if (s != null)
-                        statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
+            {
+                foreach (var stat in Stats)
+                {
+                    if (stat != null)
+                    {
+                        statBuffer.Add(new ClipStat { Key = stat.Key, Name = stat.name });
+                    }
+                }
+            }
 
-            var intBuffer = context.Baker.AddBuffer<ClipIntrinsic>(clipEntity);
+            var intrinsicBuffer = context.Baker.AddBuffer<ClipIntrinsic>(clipEntity);
             if (Intrinsics != null)
-                foreach (var i in Intrinsics)
-                    if (i != null)
-                        intBuffer.Add(new ClipIntrinsic { Key = i.Key, Name = i.name });
+            {
+                foreach (var intrinsic in Intrinsics)
+                {
+                    if (intrinsic != null)
+                    {
+                        intrinsicBuffer.Add(new ClipIntrinsic
+                        {
+                            Key = intrinsic.Key,
+                            Name = intrinsic.name,
+                            Min = intrinsic.Range.x,
+                            Max = intrinsic.Range.y,
+                            MinStat = intrinsic.MinStat,
+                            MaxStat = intrinsic.MaxStat,
+                        });
+                    }
+                }
+            }
 
-            var evBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);
+            var eventBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);
             if (Events != null)
-                foreach (var e in Events)
-                    if (e.Event != null)
-                        evBuffer.Add(new ClipEvent
-                            { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
+            {
+                foreach (var config in Events)
+                {
+                    if (config.Event != null)
+                    {
+                        eventBuffer.Add(new ClipEvent
+                        {
+                            Key = config.Event.Key,
+                            Name = config.Event.name,
+                            Duration = config.DisplayDuration,
+                        });
+                    }
+                }
+            }
 
-            // Empty buffer for the system to populate at runtime
             context.Baker.AddBuffer<ActiveUIEvent>(clipEntity);
 
             base.Bake(clipEntity, context);

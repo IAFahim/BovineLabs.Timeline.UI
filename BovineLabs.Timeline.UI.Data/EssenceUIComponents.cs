@@ -5,7 +5,6 @@ using Unity.Entities;
 
 namespace BovineLabs.Timeline.UI.Data
 {
-    // The configured elements from the Timeline Clip
     public struct ClipStat : IBufferElementData
     {
         public StatKey Key;
@@ -16,6 +15,10 @@ namespace BovineLabs.Timeline.UI.Data
     {
         public IntrinsicKey Key;
         public FixedString32Bytes Name;
+        public int Min;
+        public int Max;
+        public StatKey MinStat;
+        public StatKey MaxStat;
     }
 
     public struct ClipEvent : IBufferElementData
@@ -25,12 +28,12 @@ namespace BovineLabs.Timeline.UI.Data
         public float Duration;
     }
 
-    // System-managed buffer to keep 1-frame events alive for their Display Duration
     public struct ActiveUIEvent : IBufferElementData
     {
         public ConditionKey Key;
         public FixedString32Bytes Name;
         public int Value;
         public float TimeRemaining;
+        public float Duration;
     }
 }
