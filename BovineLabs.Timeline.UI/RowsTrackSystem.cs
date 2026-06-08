@@ -4,10 +4,10 @@
 
 namespace BovineLabs.Timeline.UI
 {
-    using BovineLabs.Anchor;
+    using Anchor;
     using BovineLabs.Timeline.Data;
-    using BovineLabs.Timeline.UI.Data;
-    using BovineLabs.Timeline.UI.Data.ViewModel;
+    using Data;
+    using Data.ViewModel;
     using Unity.Burst;
     using Unity.Collections;
     using Unity.Entities;
@@ -26,38 +26,38 @@ namespace BovineLabs.Timeline.UI
 
         public void OnCreate(ref SystemState state)
         {
-            this.uiHelper = new UIHelper<RowsViewModel, RowsViewModel.Data>(ref state,
+            uiHelper = new UIHelper<RowsViewModel, RowsViewModel.Data>(ref state,
                 ComponentType.ReadOnly<NumberComponent>());
 
-            this.scratch = new NativeList<RowsViewModel.Data.Row>(Allocator.Persistent);
+            scratch = new NativeList<RowsViewModel.Data.Row>(Allocator.Persistent);
         }
 
         public void OnDestroy(ref SystemState state)
         {
-            this.scratch.Dispose();
+            scratch.Dispose();
         }
 
         public void OnStartRunning(ref SystemState state)
         {
-            this.uiHelper.Bind();
+            uiHelper.Bind();
         }
 
         public void OnStopRunning(ref SystemState state)
         {
-            this.uiHelper.Unbind();
+            uiHelper.Unbind();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            this.scratch.Clear();
+            scratch.Clear();
 
             foreach (var (number, entity) in SystemAPI
                 .Query<RefRO<NumberComponent>>()
                 .WithAll<TimelineActive, ClipActive>()
                 .WithEntityAccess())
             {
-                this.scratch.Add(new RowsViewModel.Data.Row
+                scratch.Add(new RowsViewModel.Data.Row
                 {
                     Source = entity,
                     RawLabel = entity.ToFixedString(),
@@ -65,9 +65,9 @@ namespace BovineLabs.Timeline.UI
                 });
             }
 
-            ref var data = ref this.uiHelper.Binding;
-            data.IsVisible = this.scratch.Length > 0;
-            data.Rows = this.scratch;
+            ref var data = ref uiHelper.Binding;
+            data.IsVisible = scratch.Length > 0;
+            data.Rows = scratch;
         }
     }
 }
