@@ -1,9 +1,8 @@
 using System;
+using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Timeline.Authoring;
 using BovineLabs.Timeline.UI.Data;
-using BovineLabs.Core.ObjectManagement;
 using Unity.Entities;
-using UnityEngine;
 using UnityEngine.Timeline;
 
 namespace BovineLabs.Timeline.UI.Authoring

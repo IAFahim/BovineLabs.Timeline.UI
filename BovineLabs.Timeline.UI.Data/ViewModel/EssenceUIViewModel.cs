@@ -14,8 +14,15 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
         [CreateProperty(ReadOnly = true)] public UIArray<Data.IntrinsicRow> Intrinsics => Value.Intrinsics;
         [CreateProperty(ReadOnly = true)] public UIArray<Data.EventRow> Events => Value.Events;
 
-        public void Load() => Value.Initialize();
-        public void Unload() => Value.Dispose();
+        public void Load()
+        {
+            Value.Initialize();
+        }
+
+        public void Unload()
+        {
+            Value.Dispose();
+        }
 
         public partial struct Data
         {
@@ -39,7 +46,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             }
 
             [GeneratePropertyBag]
-            public partial struct StatRow : IEquatable<StatRow>
+            public struct StatRow : IEquatable<StatRow>
             {
                 public int Player;
                 public ushort Key;
@@ -52,12 +59,20 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
                 [CreateProperty(ReadOnly = true)] public string Value => Scaled.ToString("0.##");
                 [CreateProperty(ReadOnly = true)] public string Breakdown => $"{Added} x {Multi.ToString("0.##")}";
 
-                public bool Equals(StatRow other) => Player == other.Player && Key == other.Key && Added == other.Added && Multi.Equals(other.Multi);
-                public override int GetHashCode() => unchecked((Player * 397) ^ (Key << 8) ^ Added);
+                public bool Equals(StatRow other)
+                {
+                    return Player == other.Player && Key == other.Key && Added == other.Added &&
+                           Multi.Equals(other.Multi);
+                }
+
+                public override int GetHashCode()
+                {
+                    return unchecked((Player * 397) ^ (Key << 8) ^ Added);
+                }
             }
 
             [GeneratePropertyBag]
-            public partial struct IntrinsicRow : IEquatable<IntrinsicRow>
+            public struct IntrinsicRow : IEquatable<IntrinsicRow>
             {
                 public int Player;
                 public ushort Key;
@@ -68,14 +83,24 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
 
                 [CreateProperty(ReadOnly = true)] public string Label => RawName.ToString();
                 [CreateProperty(ReadOnly = true)] public string Display => $"{Current} / {Max}";
-                [CreateProperty(ReadOnly = true)] public float Fraction => Max > Min ? math.saturate((Current - (float)Min) / (Max - Min)) : 0f;
 
-                public bool Equals(IntrinsicRow other) => Player == other.Player && Key == other.Key && Current == other.Current && Min == other.Min && Max == other.Max;
-                public override int GetHashCode() => unchecked((Player * 397) ^ (Key << 8) ^ Current);
+                [CreateProperty(ReadOnly = true)]
+                public float Fraction => Max > Min ? math.saturate((Current - (float)Min) / (Max - Min)) : 0f;
+
+                public bool Equals(IntrinsicRow other)
+                {
+                    return Player == other.Player && Key == other.Key && Current == other.Current && Min == other.Min &&
+                           Max == other.Max;
+                }
+
+                public override int GetHashCode()
+                {
+                    return unchecked((Player * 397) ^ (Key << 8) ^ Current);
+                }
             }
 
             [GeneratePropertyBag]
-            public partial struct EventRow : IEquatable<EventRow>
+            public struct EventRow : IEquatable<EventRow>
             {
                 public int Player;
                 public ushort Key;
@@ -86,10 +111,20 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
 
                 [CreateProperty(ReadOnly = true)] public string Label => RawName.ToString();
                 [CreateProperty(ReadOnly = true)] public string Display => Amount.ToString();
-                [CreateProperty(ReadOnly = true)] public float Fade => Duration > 0f ? math.saturate(TimeRemaining / Duration) : 0f;
 
-                public bool Equals(EventRow other) => Player == other.Player && Key == other.Key && Amount == other.Amount && TimeRemaining.Equals(other.TimeRemaining);
-                public override int GetHashCode() => unchecked((Player * 397) ^ (Key << 8) ^ Amount);
+                [CreateProperty(ReadOnly = true)]
+                public float Fade => Duration > 0f ? math.saturate(TimeRemaining / Duration) : 0f;
+
+                public bool Equals(EventRow other)
+                {
+                    return Player == other.Player && Key == other.Key && Amount == other.Amount &&
+                           TimeRemaining.Equals(other.TimeRemaining);
+                }
+
+                public override int GetHashCode()
+                {
+                    return unchecked((Player * 397) ^ (Key << 8) ^ Amount);
+                }
             }
         }
     }

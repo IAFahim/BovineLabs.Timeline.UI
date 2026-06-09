@@ -37,45 +37,52 @@ namespace BovineLabs.Timeline.UI
 
         public void OnCreate(ref SystemState state)
         {
-            this.uiHelper = new UIHelper<EssenceUIViewModel, EssenceUIViewModel.Data>(
+            uiHelper = new UIHelper<EssenceUIViewModel, EssenceUIViewModel.Data>(
                 ref state, ComponentType.ReadOnly<ClipStat>());
 
-            this.statScratch = new NativeList<EssenceUIViewModel.Data.StatRow>(Allocator.Persistent);
-            this.intrinsicScratch = new NativeList<EssenceUIViewModel.Data.IntrinsicRow>(Allocator.Persistent);
-            this.eventScratch = new NativeList<EssenceUIViewModel.Data.EventRow>(Allocator.Persistent);
+            statScratch = new NativeList<EssenceUIViewModel.Data.StatRow>(Allocator.Persistent);
+            intrinsicScratch = new NativeList<EssenceUIViewModel.Data.IntrinsicRow>(Allocator.Persistent);
+            eventScratch = new NativeList<EssenceUIViewModel.Data.EventRow>(Allocator.Persistent);
 
-            this.targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
-            this.sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
-            this.linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
+            targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
+            sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
+            linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
 
             state.RequireForUpdate<ControllableRegistry>();
         }
 
         public void OnDestroy(ref SystemState state)
         {
-            this.statScratch.Dispose();
-            this.intrinsicScratch.Dispose();
-            this.eventScratch.Dispose();
+            statScratch.Dispose();
+            intrinsicScratch.Dispose();
+            eventScratch.Dispose();
         }
 
-        public void OnStartRunning(ref SystemState state) => this.uiHelper.Bind();
-        public void OnStopRunning(ref SystemState state) => this.uiHelper.Unbind();
+        public void OnStartRunning(ref SystemState state)
+        {
+            uiHelper.Bind();
+        }
+
+        public void OnStopRunning(ref SystemState state)
+        {
+            uiHelper.Unbind();
+        }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            this.statScratch.Clear();
-            this.intrinsicScratch.Clear();
-            this.eventScratch.Clear();
+            statScratch.Clear();
+            intrinsicScratch.Clear();
+            eventScratch.Clear();
 
             var dt = SystemAPI.Time.DeltaTime;
             var statsLookup = SystemAPI.GetBufferLookup<Stat>(true);
             var intrinsicsLookup = SystemAPI.GetBufferLookup<Intrinsic>(true);
             var eventsLookup = SystemAPI.GetBufferLookup<ConditionEvent>(true);
 
-            this.targetsLookup.Update(ref state);
-            this.sourcesLookup.Update(ref state);
-            this.linksLookup.Update(ref state);
+            targetsLookup.Update(ref state);
+            sourcesLookup.Update(ref state);
+            linksLookup.Update(ref state);
             var players = SystemAPI.GetSingleton<ControllableRegistry>();
 
             state.Dependency.Complete();
@@ -83,15 +90,13 @@ namespace BovineLabs.Timeline.UI
             var visible = false;
 
             foreach (var (clipStats, clipIntrinsics, clipEvents, _activeEvents, trackBinding, source) in SystemAPI
-                .Query<DynamicBuffer<ClipStat>, DynamicBuffer<ClipIntrinsic>, DynamicBuffer<ClipEvent>,
-                    DynamicBuffer<ActiveUIEvent>, RefRO<TrackBinding>, RefRO<UISource>>()
-                .WithAll<TimelineActive, ClipActive>())
+                         .Query<DynamicBuffer<ClipStat>, DynamicBuffer<ClipIntrinsic>, DynamicBuffer<ClipEvent>,
+                             DynamicBuffer<ActiveUIEvent>, RefRO<TrackBinding>, RefRO<UISource>>()
+                         .WithAll<TimelineActive, ClipActive>())
             {
                 if (!UISourceResolver.TryResolve(source.ValueRO, trackBinding.ValueRO.Value, players,
-                        this.targetsLookup, this.sourcesLookup, this.linksLookup, out var player))
-                {
+                        targetsLookup, sourcesLookup, linksLookup, out var player))
                     continue;
-                }
 
                 visible = true;
                 var playerIndex = player.Index;
@@ -106,14 +111,14 @@ namespace BovineLabs.Timeline.UI
                         if (!statMap.TryGetValue(clipStat.Key, out var stat))
                             continue;
 
-                        this.statScratch.Add(new EssenceUIViewModel.Data.StatRow
+                        statScratch.Add(new EssenceUIViewModel.Data.StatRow
                         {
                             Player = playerIndex,
-                            Key = (ushort)clipStat.Key.Value,
+                            Key = clipStat.Key.Value,
                             RawName = clipStat.Name,
                             Added = stat.Added,
                             Multi = stat.Multi,
-                            Scaled = stat.ValueFloat,
+                            Scaled = stat.ValueFloat
                         });
                     }
                 }
@@ -130,20 +135,22 @@ namespace BovineLabs.Timeline.UI
 
                         if (hasStats)
                         {
-                            if (clipIntrinsic.MinStat.Value != 0 && statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
+                            if (clipIntrinsic.MinStat.Value != 0 &&
+                                statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
                                 min = (int)math.floor(minStat.Value);
-                            if (clipIntrinsic.MaxStat.Value != 0 && statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
+                            if (clipIntrinsic.MaxStat.Value != 0 &&
+                                statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
                                 max = (int)math.floor(maxStat.Value);
                         }
 
-                        this.intrinsicScratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
+                        intrinsicScratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
                         {
                             Player = playerIndex,
-                            Key = (ushort)clipIntrinsic.Key.Value,
+                            Key = clipIntrinsic.Key.Value,
                             RawName = clipIntrinsic.Name,
                             Current = current,
                             Min = min,
-                            Max = max,
+                            Max = max
                         });
                     }
                 }
@@ -170,7 +177,6 @@ namespace BovineLabs.Timeline.UI
 
                         var refreshed = false;
                         for (var i = 0; i < activeEvents.Length; i++)
-                        {
                             if (activeEvents[i].Key.Equals(clipEvent.Key))
                             {
                                 var ev = activeEvents[i];
@@ -181,42 +187,37 @@ namespace BovineLabs.Timeline.UI
                                 refreshed = true;
                                 break;
                             }
-                        }
 
                         if (!refreshed)
-                        {
                             activeEvents.Add(new ActiveUIEvent
                             {
                                 Key = clipEvent.Key,
                                 Name = clipEvent.Name,
                                 Value = amount,
                                 TimeRemaining = clipEvent.Duration,
-                                Duration = clipEvent.Duration,
+                                Duration = clipEvent.Duration
                             });
-                        }
                     }
                 }
 
                 // Emit event rows
                 foreach (var active in activeEvents)
-                {
-                    this.eventScratch.Add(new EssenceUIViewModel.Data.EventRow
+                    eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {
                         Player = playerIndex,
                         Key = (ushort)active.Key.Value,
                         RawName = active.Name,
                         Amount = active.Value,
                         TimeRemaining = active.TimeRemaining,
-                        Duration = active.Duration,
+                        Duration = active.Duration
                     });
-                }
             }
 
-            ref var data = ref this.uiHelper.Binding;
+            ref var data = ref uiHelper.Binding;
             data.IsVisible = visible;
-            data.Stats = this.statScratch;
-            data.Intrinsics = this.intrinsicScratch;
-            data.Events = this.eventScratch;
+            data.Stats = statScratch;
+            data.Intrinsics = intrinsicScratch;
+            data.Events = eventScratch;
         }
     }
 }

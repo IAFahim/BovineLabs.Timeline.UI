@@ -28,7 +28,7 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public override void Bake(Entity clipEntity, BakingContext context)
         {
-            context.Baker.AddComponent(clipEntity, this.Source.ToComponent());
+            context.Baker.AddComponent(clipEntity, Source.ToComponent());
 
             var statBuffer = context.Baker.AddBuffer<ClipStat>(clipEntity);
             if (Stats != null)
@@ -44,7 +44,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                         {
                             Key = i.Key, Name = i.name,
                             Min = i.Range.x, Max = i.Range.y,
-                            MinStat = i.MinStat, MaxStat = i.MaxStat,
+                            MinStat = i.MinStat, MaxStat = i.MaxStat
                         });
 
             var evBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);

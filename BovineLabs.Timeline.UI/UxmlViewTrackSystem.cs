@@ -1,12 +1,11 @@
+using BovineLabs.Anchor;
+using BovineLabs.Anchor.Services;
+using BovineLabs.Timeline.UI.Data;
+using Unity.Entities;
+using UnityEngine.UIElements;
+
 namespace BovineLabs.Timeline.UI
 {
-    using Anchor;
-    using Anchor.Services;
-    using BovineLabs.Timeline.Data;
-    using Data;
-    using Unity.Entities;
-    using UnityEngine.UIElements;
-
     [UpdateInGroup(typeof(TimelineComponentAnimationGroup))]
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
@@ -24,13 +23,11 @@ namespace BovineLabs.Timeline.UI
             return uxml != null;
         }
 
-        protected override bool TryApply(VisualElement root, Entity entity, in UxmlViewData data, out VisualElement inverse)
+        protected override bool TryApply(VisualElement root, Entity entity, in UxmlViewData data,
+            out VisualElement inverse)
         {
             inverse = uxml.Instantiate(data.UxmlKey.ToString());
-            if (inverse == null)
-            {
-                return false;
-            }
+            if (inverse == null) return false;
 
             Attach(inverse, data, root);
             return true;

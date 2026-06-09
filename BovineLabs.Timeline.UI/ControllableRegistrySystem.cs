@@ -1,11 +1,11 @@
+using BovineLabs.Timeline.PlayerInputs.Data;
+using BovineLabs.Timeline.UI.Data;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Entities;
+
 namespace BovineLabs.Timeline.UI
 {
-    using BovineLabs.Timeline.PlayerInputs.Data;
-    using BovineLabs.Timeline.UI.Data;
-    using Unity.Burst;
-    using Unity.Collections;
-    using Unity.Entities;
-
     [UpdateInGroup(typeof(InitializationSystemGroup))]
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
@@ -20,32 +20,27 @@ namespace BovineLabs.Timeline.UI
 
         public void OnCreate(ref SystemState state)
         {
-            this.byPlayer = new NativeArray<Entity>(PlayerCapacity, Allocator.Persistent);
+            byPlayer = new NativeArray<Entity>(PlayerCapacity, Allocator.Persistent);
 
             var singleton = state.EntityManager.CreateEntity(typeof(ControllableRegistry));
-            state.EntityManager.SetComponentData(singleton, new ControllableRegistry { ByPlayer = this.byPlayer });
+            state.EntityManager.SetComponentData(singleton, new ControllableRegistry { ByPlayer = byPlayer });
         }
 
         public void OnDestroy(ref SystemState state)
         {
-            this.byPlayer.Dispose();
+            byPlayer.Dispose();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            for (var i = 0; i < this.byPlayer.Length; i++)
-            {
-                this.byPlayer[i] = Entity.Null;
-            }
+            for (var i = 0; i < byPlayer.Length; i++) byPlayer[i] = Entity.Null;
 
-            foreach (var (player, entity) in SystemAPI.Query<RefRO<PlayerId>>().WithAll<Controllable>().WithEntityAccess())
+            foreach (var (player, entity) in SystemAPI.Query<RefRO<PlayerId>>().WithAll<Controllable>()
+                         .WithEntityAccess())
             {
                 var idx = player.ValueRO.Value;
-                if (this.byPlayer[idx] == Entity.Null || entity.Index < this.byPlayer[idx].Index)
-                {
-                    this.byPlayer[idx] = entity;
-                }
+                if (byPlayer[idx] == Entity.Null || entity.Index < byPlayer[idx].Index) byPlayer[idx] = entity;
             }
 
             SystemAPI.GetSingletonRW<ControllableRegistry>().ValueRW.Version++;

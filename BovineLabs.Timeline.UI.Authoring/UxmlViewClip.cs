@@ -1,11 +1,11 @@
+using System;
+using BovineLabs.Timeline.Authoring;
+using BovineLabs.Timeline.UI.Data;
+using Unity.Entities;
+using UnityEngine.Timeline;
+
 namespace BovineLabs.Timeline.UI.Authoring
 {
-    using System;
-    using BovineLabs.Timeline.Authoring;
-    using BovineLabs.Timeline.UI.Data;
-    using Unity.Entities;
-    using UnityEngine.Timeline;
-
     [Serializable]
     public class UxmlViewClip : DOTSClip, ITimelineClipAsset
     {
@@ -20,9 +20,9 @@ namespace BovineLabs.Timeline.UI.Authoring
         {
             context.Baker.AddComponent(clipEntity, new UxmlViewData
             {
-                UxmlKey = this.UxmlKey,
-                TargetId = this.TargetId,
-                Mode = this.Mode
+                UxmlKey = UxmlKey,
+                TargetId = TargetId,
+                Mode = Mode
             });
 
             base.Bake(clipEntity, context);

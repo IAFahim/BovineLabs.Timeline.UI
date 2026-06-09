@@ -1,13 +1,13 @@
+using BovineLabs.Anchor;
+using BovineLabs.Timeline.Data;
+using BovineLabs.Timeline.UI.Data;
+using BovineLabs.Timeline.UI.Data.ViewModel;
+using Unity.Burst;
+using Unity.Entities;
+using Unity.Mathematics;
+
 namespace BovineLabs.Timeline.UI
 {
-    using Anchor;
-    using BovineLabs.Timeline.Data;
-    using Data;
-    using Data.ViewModel;
-    using Unity.Burst;
-    using Unity.Entities;
-    using Unity.Mathematics;
-
     [UpdateInGroup(typeof(TimelineComponentAnimationGroup))]
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
@@ -24,9 +24,15 @@ namespace BovineLabs.Timeline.UI
                 ref state, ComponentType.ReadOnly<NumberComponent>());
         }
 
-        public void OnStartRunning(ref SystemState state) => uiHelper.Bind();
+        public void OnStartRunning(ref SystemState state)
+        {
+            uiHelper.Bind();
+        }
 
-        public void OnStopRunning(ref SystemState state) => uiHelper.Unbind();
+        public void OnStopRunning(ref SystemState state)
+        {
+            uiHelper.Unbind();
+        }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
@@ -42,10 +48,7 @@ namespace BovineLabs.Timeline.UI
 
             ref var data = ref uiHelper.Binding;
             data.IsVisible = visible;
-            if (visible)
-            {
-                data.Number = folded;
-            }
+            if (visible) data.Number = folded;
         }
     }
 }

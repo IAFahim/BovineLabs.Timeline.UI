@@ -8,14 +8,14 @@ namespace BovineLabs.Timeline.UI.Authoring
     [CreateAssetMenu(menuName = "YoYo")]
     public sealed class HealthSchemaObject : ScriptableObject, IUID
     {
-        [SerializeField, InspectorReadOnly] private int id;
+        [SerializeField] [InspectorReadOnly] private int id;
+
+        public int Id => id;
 
         int IUID.ID
         {
             get => id;
             set => id = value;
         }
-
-        public int Id => id;
     }
 }

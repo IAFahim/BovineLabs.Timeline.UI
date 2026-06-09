@@ -1,13 +1,13 @@
+using System.Runtime.CompilerServices;
+using BovineLabs.Core.Iterators;
+using BovineLabs.Reaction.Data.Core;
+using BovineLabs.Timeline.EntityLinks;
+using BovineLabs.Timeline.EntityLinks.Data;
+using BovineLabs.Timeline.UI.Data;
+using Unity.Entities;
+
 namespace BovineLabs.Timeline.UI
 {
-    using System.Runtime.CompilerServices;
-    using BovineLabs.Core.Iterators;
-    using BovineLabs.Reaction.Data.Core;
-    using BovineLabs.Timeline.EntityLinks;
-    using BovineLabs.Timeline.EntityLinks.Data;
-    using BovineLabs.Timeline.UI.Data;
-    using Unity.Entities;
-
     public static class UISourceResolver
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

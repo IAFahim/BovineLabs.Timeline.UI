@@ -1,10 +1,9 @@
+using BovineLabs.Timeline.UI.Data;
+using Unity.Entities;
+using UnityEngine.UIElements;
+
 namespace BovineLabs.Timeline.UI
 {
-    using BovineLabs.Timeline.Data;
-    using Data;
-    using Unity.Entities;
-    using UnityEngine.UIElements;
-
     [UpdateInGroup(typeof(TimelineComponentAnimationGroup))]
     [UpdateAfter(typeof(UxmlViewTrackSystem))]
     [WorldSystemFilter(
@@ -15,19 +14,8 @@ namespace BovineLabs.Timeline.UI
     public sealed partial class UssClassTrackSystem
         : ReversibleEffectSystem<UssClassData, UssClassTrackSystem.AppliedClass, UssClassCleanup>
     {
-        public readonly struct AppliedClass
-        {
-            public readonly VisualElement Element;
-            public readonly string ClassName;
-
-            public AppliedClass(VisualElement element, string className)
-            {
-                Element = element;
-                ClassName = className;
-            }
-        }
-
-        protected override bool TryApply(VisualElement root, Entity entity, in UssClassData data, out AppliedClass inverse)
+        protected override bool TryApply(VisualElement root, Entity entity, in UssClassData data,
+            out AppliedClass inverse)
         {
             var target = data.TargetId.IsEmpty ? root : root.Q(data.TargetId.ToString());
             if (target == null)
@@ -45,6 +33,18 @@ namespace BovineLabs.Timeline.UI
         protected override void Revert(AppliedClass inverse)
         {
             inverse.Element?.RemoveFromClassList(inverse.ClassName);
+        }
+
+        public readonly struct AppliedClass
+        {
+            public readonly VisualElement Element;
+            public readonly string ClassName;
+
+            public AppliedClass(VisualElement element, string className)
+            {
+                Element = element;
+                ClassName = className;
+            }
         }
     }
 }

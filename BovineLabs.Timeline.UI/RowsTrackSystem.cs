@@ -2,16 +2,16 @@
 //     Copyright (c) BovineLabs. All rights reserved.
 // </copyright>
 
+using BovineLabs.Anchor;
+using BovineLabs.Timeline.Data;
+using BovineLabs.Timeline.UI.Data;
+using BovineLabs.Timeline.UI.Data.ViewModel;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Entities;
+
 namespace BovineLabs.Timeline.UI
 {
-    using Anchor;
-    using BovineLabs.Timeline.Data;
-    using Data;
-    using Data.ViewModel;
-    using Unity.Burst;
-    using Unity.Collections;
-    using Unity.Entities;
-
     [UpdateInGroup(typeof(TimelineComponentAnimationGroup))]
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
@@ -53,17 +53,15 @@ namespace BovineLabs.Timeline.UI
             scratch.Clear();
 
             foreach (var (number, entity) in SystemAPI
-                .Query<RefRO<NumberComponent>>()
-                .WithAll<TimelineActive, ClipActive>()
-                .WithEntityAccess())
-            {
+                         .Query<RefRO<NumberComponent>>()
+                         .WithAll<TimelineActive, ClipActive>()
+                         .WithEntityAccess())
                 scratch.Add(new RowsViewModel.Data.Row
                 {
                     Source = entity,
                     RawLabel = entity.ToFixedString(),
-                    RawValue = number.ValueRO.Value,
+                    RawValue = number.ValueRO.Value
                 });
-            }
 
             ref var data = ref uiHelper.Binding;
             data.IsVisible = scratch.Length > 0;

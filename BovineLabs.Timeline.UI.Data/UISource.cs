@@ -1,8 +1,8 @@
+using BovineLabs.Reaction.Data.Core;
+using Unity.Entities;
+
 namespace BovineLabs.Timeline.UI.Data
 {
-    using BovineLabs.Reaction.Data.Core;
-    using Unity.Entities;
-
     public struct UISource : IComponentData
     {
         public const byte NoPlayer = byte.MaxValue;
@@ -15,7 +15,7 @@ namespace BovineLabs.Timeline.UI.Data
         {
             Player = NoPlayer,
             Route = Target.Self,
-            LinkKey = 0,
+            LinkKey = 0
         };
     }
 }

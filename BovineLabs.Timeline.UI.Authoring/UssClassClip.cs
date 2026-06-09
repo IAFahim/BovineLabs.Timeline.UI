@@ -1,11 +1,11 @@
+using System;
+using BovineLabs.Timeline.Authoring;
+using BovineLabs.Timeline.UI.Data;
+using Unity.Entities;
+using UnityEngine.Timeline;
+
 namespace BovineLabs.Timeline.UI.Authoring
 {
-    using System;
-    using BovineLabs.Timeline.Authoring;
-    using BovineLabs.Timeline.UI.Data;
-    using Unity.Entities;
-    using UnityEngine.Timeline;
-
     [Serializable]
     public class UssClassClip : DOTSClip, ITimelineClipAsset
     {
@@ -19,8 +19,8 @@ namespace BovineLabs.Timeline.UI.Authoring
         {
             context.Baker.AddComponent(clipEntity, new UssClassData
             {
-                TargetId = this.TargetId,
-                ClassName = this.ClassName
+                TargetId = TargetId,
+                ClassName = ClassName
             });
 
             base.Bake(clipEntity, context);

@@ -2,17 +2,17 @@
 //     Copyright (c) BovineLabs. All rights reserved.
 // </copyright>
 
+using System;
+using System.ComponentModel;
+using BovineLabs.Anchor;
+using BovineLabs.Timeline.UI.Data.ViewModel;
+using Unity.AppUI.UI;
+using UnityEngine.UIElements;
+
 #if UNITY_EDITOR || BL_DEBUG
 
 namespace BovineLabs.Timeline.UI.Debug.Views
 {
-    using System;
-    using System.ComponentModel;
-    using BovineLabs.Anchor;
-    using BovineLabs.Timeline.UI.Data.ViewModel;
-    using Unity.AppUI.UI;
-    using UnityEngine.UIElements;
-
     [Transient]
     public class RowsView : View<RowsViewModel>, IDisposable
     {
@@ -21,22 +21,22 @@ namespace BovineLabs.Timeline.UI.Debug.Views
         public RowsView()
             : base(new RowsViewModel())
         {
-            this.grid = new GridView
+            grid = new GridView
             {
-                dataSource = this.ViewModel,
+                dataSource = ViewModel,
                 selectionType = SelectionType.None,
-                makeItem = this.MakeRow,
-                bindItem = this.BindRow,
-                itemsSource = this.ViewModel.Rows,
+                makeItem = MakeRow,
+                bindItem = BindRow,
+                itemsSource = ViewModel.Rows
             };
 
-            this.Add(this.grid);
-            this.ViewModel.PropertyChanged += this.OnPropertyChanged;
+            Add(grid);
+            ViewModel.PropertyChanged += OnPropertyChanged;
         }
 
         public void Dispose()
         {
-            this.ViewModel.PropertyChanged -= this.OnPropertyChanged;
+            ViewModel.PropertyChanged -= OnPropertyChanged;
         }
 
         private VisualElement MakeRow()
@@ -54,8 +54,8 @@ namespace BovineLabs.Timeline.UI.Debug.Views
             // We use bindItem to handle IsVisible toggles on the row container itself.
             if (element.Q<Text>("detail") is { } detail)
             {
-                var row = this.ViewModel.Value.Rows[index];
-                detail.text = row.Value.ToString();
+                var row = ViewModel.Value.Rows[index];
+                detail.text = row.Value;
             }
         }
 
@@ -63,8 +63,8 @@ namespace BovineLabs.Timeline.UI.Debug.Views
         {
             if (e.PropertyName == nameof(RowsViewModel.Rows))
             {
-                this.grid.itemsSource = this.ViewModel.Rows;
-                this.grid.Refresh();
+                grid.itemsSource = ViewModel.Rows;
+                grid.Refresh();
             }
         }
     }
