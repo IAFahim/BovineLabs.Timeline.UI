@@ -1,7 +1,11 @@
 using BovineLabs.Anchor;
+using BovineLabs.Core.Extensions;
+using BovineLabs.Core.Iterators;
 using BovineLabs.Essence.Data;
 using BovineLabs.Reaction.Data.Conditions;
+using BovineLabs.Reaction.Data.Core;
 using BovineLabs.Timeline.Data;
+using BovineLabs.Timeline.EntityLinks.Data;
 using BovineLabs.Timeline.Essence;
 using BovineLabs.Timeline.UI.Data;
 using BovineLabs.Timeline.UI.Data.ViewModel;
@@ -27,6 +31,9 @@ namespace BovineLabs.Timeline.UI
         private NativeList<EssenceUIViewModel.Data.StatRow> statScratch;
         private NativeList<EssenceUIViewModel.Data.IntrinsicRow> intrinsicScratch;
         private NativeList<EssenceUIViewModel.Data.EventRow> eventScratch;
+        private UnsafeComponentLookup<Targets> targetsLookup;
+        private UnsafeComponentLookup<EntityLinkSource> sourcesLookup;
+        private UnsafeBufferLookup<EntityLinkEntry> linksLookup;
 
         public void OnCreate(ref SystemState state)
         {
@@ -36,6 +43,12 @@ namespace BovineLabs.Timeline.UI
             this.statScratch = new NativeList<EssenceUIViewModel.Data.StatRow>(Allocator.Persistent);
             this.intrinsicScratch = new NativeList<EssenceUIViewModel.Data.IntrinsicRow>(Allocator.Persistent);
             this.eventScratch = new NativeList<EssenceUIViewModel.Data.EventRow>(Allocator.Persistent);
+
+            this.targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
+            this.sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
+            this.linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
+
+            state.RequireForUpdate<ControllableRegistry>();
         }
 
         public void OnDestroy(ref SystemState state)
@@ -46,7 +59,6 @@ namespace BovineLabs.Timeline.UI
         }
 
         public void OnStartRunning(ref SystemState state) => this.uiHelper.Bind();
-
         public void OnStopRunning(ref SystemState state) => this.uiHelper.Unbind();
 
         [BurstCompile]
@@ -61,17 +73,27 @@ namespace BovineLabs.Timeline.UI
             var intrinsicsLookup = SystemAPI.GetBufferLookup<Intrinsic>(true);
             var eventsLookup = SystemAPI.GetBufferLookup<ConditionEvent>(true);
 
+            this.targetsLookup.Update(ref state);
+            this.sourcesLookup.Update(ref state);
+            this.linksLookup.Update(ref state);
+            var players = SystemAPI.GetSingleton<ControllableRegistry>();
+
             state.Dependency.Complete();
 
             var visible = false;
 
-            foreach (var (clipStats, clipIntrinsics, clipEvents, _activeEvents, binding) in SystemAPI
+            foreach (var (clipStats, clipIntrinsics, clipEvents, _activeEvents, trackBinding, source) in SystemAPI
                 .Query<DynamicBuffer<ClipStat>, DynamicBuffer<ClipIntrinsic>, DynamicBuffer<ClipEvent>,
-                    DynamicBuffer<ActiveUIEvent>, RefRO<TrackBinding>>()
+                    DynamicBuffer<ActiveUIEvent>, RefRO<TrackBinding>, RefRO<UISource>>()
                 .WithAll<TimelineActive, ClipActive>())
             {
+                if (!UISourceResolver.TryResolve(source.ValueRO, trackBinding.ValueRO.Value, players,
+                        this.targetsLookup, this.sourcesLookup, this.linksLookup, out var player))
+                {
+                    continue;
+                }
+
                 visible = true;
-                var player = binding.ValueRO.Value;
                 var playerIndex = player.Index;
                 var activeEvents = _activeEvents;
                 var hasStats = statsLookup.TryGetBuffer(player, out var stats);
@@ -82,9 +104,7 @@ namespace BovineLabs.Timeline.UI
                     foreach (var clipStat in clipStats)
                     {
                         if (!statMap.TryGetValue(clipStat.Key, out var stat))
-                        {
                             continue;
-                        }
 
                         this.statScratch.Add(new EssenceUIViewModel.Data.StatRow
                         {
@@ -111,14 +131,9 @@ namespace BovineLabs.Timeline.UI
                         if (hasStats)
                         {
                             if (clipIntrinsic.MinStat.Value != 0 && statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
-                            {
                                 min = (int)math.floor(minStat.Value);
-                            }
-
                             if (clipIntrinsic.MaxStat.Value != 0 && statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
-                            {
                                 max = (int)math.floor(maxStat.Value);
-                            }
                         }
 
                         this.intrinsicScratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
@@ -133,40 +148,36 @@ namespace BovineLabs.Timeline.UI
                     }
                 }
 
+                // Tick down active event timers
                 for (var i = activeEvents.Length - 1; i >= 0; i--)
                 {
                     var active = activeEvents[i];
                     active.TimeRemaining -= dt;
                     if (active.TimeRemaining <= 0f)
-                    {
                         activeEvents.RemoveAtSwapBack(i);
-                    }
                     else
-                    {
                         activeEvents[i] = active;
-                    }
                 }
 
+                // Ingest new condition events
                 if (eventsLookup.TryGetBuffer(player, out var conditionEvents))
                 {
                     var eventMap = conditionEvents.AsMap();
                     foreach (var clipEvent in clipEvents)
                     {
                         if (!eventMap.TryGetValue(clipEvent.Key, out var amount))
-                        {
                             continue;
-                        }
 
                         var refreshed = false;
                         for (var i = 0; i < activeEvents.Length; i++)
                         {
                             if (activeEvents[i].Key.Equals(clipEvent.Key))
                             {
-                                var active = activeEvents[i];
-                                active.Value = amount;
-                                active.TimeRemaining = clipEvent.Duration;
-                                active.Duration = clipEvent.Duration;
-                                activeEvents[i] = active;
+                                var ev = activeEvents[i];
+                                ev.Value = amount;
+                                ev.TimeRemaining = clipEvent.Duration;
+                                ev.Duration = clipEvent.Duration;
+                                activeEvents[i] = ev;
                                 refreshed = true;
                                 break;
                             }
@@ -186,6 +197,7 @@ namespace BovineLabs.Timeline.UI
                     }
                 }
 
+                // Emit event rows
                 foreach (var active in activeEvents)
                 {
                     this.eventScratch.Add(new EssenceUIViewModel.Data.EventRow

@@ -12,12 +12,13 @@ namespace BovineLabs.Timeline.UI.Authoring
     public struct EventUIConfig
     {
         public ConditionEventObject Event;
-        public float DisplayDuration;
+        public float DisplayDuration; // How long to buffer the event on screen
     }
 
     [Serializable]
     public class EssenceUIClip : DOTSClip, ITimelineClipAsset
     {
+        public UISourceAuthoring Source;
         public StatSchemaObject[] Stats;
         public IntrinsicSchemaObject[] Intrinsics;
         public EventUIConfig[] Events;
@@ -27,55 +28,33 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public override void Bake(Entity clipEntity, BakingContext context)
         {
+            context.Baker.AddComponent(clipEntity, this.Source.ToComponent());
+
             var statBuffer = context.Baker.AddBuffer<ClipStat>(clipEntity);
             if (Stats != null)
-            {
-                foreach (var stat in Stats)
-                {
-                    if (stat != null)
-                    {
-                        statBuffer.Add(new ClipStat { Key = stat.Key, Name = stat.name });
-                    }
-                }
-            }
+                foreach (var s in Stats)
+                    if (s != null)
+                        statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
 
-            var intrinsicBuffer = context.Baker.AddBuffer<ClipIntrinsic>(clipEntity);
+            var intBuffer = context.Baker.AddBuffer<ClipIntrinsic>(clipEntity);
             if (Intrinsics != null)
-            {
-                foreach (var intrinsic in Intrinsics)
-                {
-                    if (intrinsic != null)
-                    {
-                        intrinsicBuffer.Add(new ClipIntrinsic
+                foreach (var i in Intrinsics)
+                    if (i != null)
+                        intBuffer.Add(new ClipIntrinsic
                         {
-                            Key = intrinsic.Key,
-                            Name = intrinsic.name,
-                            Min = intrinsic.Range.x,
-                            Max = intrinsic.Range.y,
-                            MinStat = intrinsic.MinStat,
-                            MaxStat = intrinsic.MaxStat,
+                            Key = i.Key, Name = i.name,
+                            Min = i.Range.x, Max = i.Range.y,
+                            MinStat = i.MinStat, MaxStat = i.MaxStat,
                         });
-                    }
-                }
-            }
 
-            var eventBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);
+            var evBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);
             if (Events != null)
-            {
-                foreach (var config in Events)
-                {
-                    if (config.Event != null)
-                    {
-                        eventBuffer.Add(new ClipEvent
-                        {
-                            Key = config.Event.Key,
-                            Name = config.Event.name,
-                            Duration = config.DisplayDuration,
-                        });
-                    }
-                }
-            }
+                foreach (var e in Events)
+                    if (e.Event != null)
+                        evBuffer.Add(new ClipEvent
+                            { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
 
+            // Empty buffer for the system to populate at runtime
             context.Baker.AddBuffer<ActiveUIEvent>(clipEntity);
 
             base.Bake(clipEntity, context);
