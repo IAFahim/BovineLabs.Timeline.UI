@@ -3,6 +3,7 @@ using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Timeline.Authoring;
 using BovineLabs.Timeline.UI.Data;
 using Unity.Entities;
+using UnityEngine;
 using UnityEngine.Timeline;
 
 namespace BovineLabs.Timeline.UI.Authoring
@@ -10,6 +11,7 @@ namespace BovineLabs.Timeline.UI.Authoring
     [Serializable]
     public class DataDisplayClip : DOTSClip, ITimelineClipAsset
     {
+        [Tooltip("Schema objects whose IdValue is read from the track-bound entity and shown as rows.")]
         public HealthSchemaObject[] Health;
 
         public override double duration => 1;

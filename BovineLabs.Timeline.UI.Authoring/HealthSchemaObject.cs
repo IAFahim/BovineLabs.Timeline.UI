@@ -5,7 +5,7 @@ using UnityEngine;
 namespace BovineLabs.Timeline.UI.Authoring
 {
     [AutoRef("GameSettings", "healthSchemas", nameof(HealthSchemaObject), "Schemas/Health")]
-    [CreateAssetMenu(menuName = "YoYo")]
+    [CreateAssetMenu(menuName = "BovineLabs/UI/Health Schema")]
     public sealed class HealthSchemaObject : ScriptableObject, IUID
     {
         [SerializeField] [InspectorReadOnly] private int id;

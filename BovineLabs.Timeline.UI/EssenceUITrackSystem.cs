@@ -205,7 +205,7 @@ namespace BovineLabs.Timeline.UI
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {
                         Player = playerIndex,
-                        Key = (ushort)active.Key.Value,
+                        Key = active.Key.Value,
                         RawName = active.Name,
                         Amount = active.Value,
                         TimeRemaining = active.TimeRemaining,

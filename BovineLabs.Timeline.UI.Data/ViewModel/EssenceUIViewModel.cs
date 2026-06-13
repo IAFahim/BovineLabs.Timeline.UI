@@ -103,7 +103,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             public struct EventRow : IEquatable<EventRow>
             {
                 public int Player;
-                public ushort Key;
+                public int Key;
                 public FixedString32Bytes RawName;
                 public int Amount;
                 public float TimeRemaining;

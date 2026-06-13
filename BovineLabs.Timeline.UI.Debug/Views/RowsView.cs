@@ -32,6 +32,7 @@ namespace BovineLabs.Timeline.UI.Debug.Views
 
             Add(grid);
             ViewModel.PropertyChanged += OnPropertyChanged;
+            RegisterCallback<DetachFromPanelEvent>(_ => ViewModel.PropertyChanged -= OnPropertyChanged);
         }
 
         public void Dispose()

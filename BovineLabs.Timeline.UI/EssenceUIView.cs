@@ -31,6 +31,7 @@ namespace BovineLabs.Timeline.UI
             Add(Section("Events", events));
 
             ViewModel.PropertyChanged += OnPropertyChanged;
+            RegisterCallback<DetachFromPanelEvent>(_ => ViewModel.PropertyChanged -= OnPropertyChanged);
         }
 
         public void Dispose()
