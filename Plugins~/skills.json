@@ -1,0 +1,7 @@
+[
+  {
+    "id": "unity-track-ui",
+    "displayName": "Track Ui",
+    "description": "Master of the BovineLabs.Timeline.UI track family — UxmlViewTrack, UITextRevealTrack, NumberTrack, DataDisplayTrack, EssenceUITrack (+ EssenceUIClip/UssClassTrack) — driving on-screen UI (UI Toolkit / app-ui panels) FROM a DOTS timeline: spawn/teardown UXML, typewriter text reveal, show a number, show stat/intrinsic/event readouts. Two runtime families: VisualElement-mutating \\\"reversible effects\\\" (UXML/text/USS) vs ViewModel-binding HUD panels (Number/DataDisplay/EssenceUI). Portable to any project with the package; worked example from vex-ee. Use when a designer says \\\"during this cutscene, pop up a panel / type out a line / show the combo count / show the player's health bar\\\"."
+  }
+]
