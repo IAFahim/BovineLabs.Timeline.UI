@@ -155,7 +155,6 @@ namespace BovineLabs.Timeline.UI
                     }
                 }
 
-                // Tick down active event timers
                 for (var i = activeEvents.Length - 1; i >= 0; i--)
                 {
                     var active = activeEvents[i];
@@ -166,7 +165,6 @@ namespace BovineLabs.Timeline.UI
                         activeEvents[i] = active;
                 }
 
-                // Ingest new condition events
                 if (eventsLookup.TryGetBuffer(player, out var conditionEvents))
                 {
                     var eventMap = conditionEvents.AsMap();
@@ -200,7 +198,6 @@ namespace BovineLabs.Timeline.UI
                     }
                 }
 
-                // Emit event rows
                 foreach (var active in activeEvents)
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {

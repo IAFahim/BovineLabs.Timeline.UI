@@ -12,7 +12,7 @@ namespace BovineLabs.Timeline.UI.Authoring
     public struct EventUIConfig
     {
         public ConditionEventObject Event;
-        public float DisplayDuration; // How long to buffer the event on screen
+        public float DisplayDuration;
     }
 
     [Serializable]
@@ -54,7 +54,6 @@ namespace BovineLabs.Timeline.UI.Authoring
                         evBuffer.Add(new ClipEvent
                             { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
 
-            // Empty buffer for the system to populate at runtime
             context.Baker.AddBuffer<ActiveUIEvent>(clipEntity);
 
             base.Bake(clipEntity, context);
