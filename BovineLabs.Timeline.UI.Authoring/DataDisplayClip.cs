@@ -23,8 +23,11 @@ namespace BovineLabs.Timeline.UI.Authoring
 
             if (Health != null)
                 foreach (var schema in Health)
+                {
+                    context.Baker.DependsOn(schema);
                     if (schema is IUID uid)
                         buffer.Add(new ClipDataId { Id = uid.ID, Label = schema.name });
+                }
 
             base.Bake(clipEntity, context);
         }

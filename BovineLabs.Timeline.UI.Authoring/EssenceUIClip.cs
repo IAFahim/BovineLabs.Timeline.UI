@@ -28,6 +28,18 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public override void Bake(Entity clipEntity, BakingContext context)
         {
+            // Register the referenced schema assets so a change to any re-triggers baking.
+            context.Baker.DependsOn(Source.Link);
+            if (Stats != null)
+                foreach (var s in Stats)
+                    context.Baker.DependsOn(s);
+            if (Intrinsics != null)
+                foreach (var i in Intrinsics)
+                    context.Baker.DependsOn(i);
+            if (Events != null)
+                foreach (var e in Events)
+                    context.Baker.DependsOn(e.Event);
+
             context.Baker.AddComponent(clipEntity, Source.ToComponent());
 
             var statBuffer = context.Baker.AddBuffer<ClipStat>(clipEntity);
