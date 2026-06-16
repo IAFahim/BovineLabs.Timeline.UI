@@ -87,6 +87,12 @@ namespace BovineLabs.Timeline.UI
 
             state.Dependency.Complete();
 
+            // Reset per-clip event state once a clip is no longer active, so a re-activated clip does
+            // not replay the previous activation's events or resume already-expired fade timers.
+            foreach (var staleEvents in SystemAPI.Query<DynamicBuffer<ActiveUIEvent>>().WithDisabled<ClipActive>())
+                if (staleEvents.Length > 0)
+                    staleEvents.Clear();
+
             var visible = false;
 
             foreach (var (clipStats, clipIntrinsics, clipEvents, _activeEvents, trackBinding, source) in SystemAPI
