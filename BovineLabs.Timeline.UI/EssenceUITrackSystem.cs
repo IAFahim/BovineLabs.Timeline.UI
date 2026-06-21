@@ -110,99 +110,15 @@ namespace BovineLabs.Timeline.UI
                 var hasStats = statsLookup.TryGetBuffer(player, out var stats);
 
                 if (hasStats)
-                {
-                    var statMap = stats.AsMap();
-                    foreach (var clipStat in clipStats)
-                    {
-                        if (!statMap.TryGetValue(clipStat.Key, out var stat))
-                            continue;
-
-                        statScratch.Add(new EssenceUIViewModel.Data.StatRow
-                        {
-                            Player = playerIndex,
-                            Key = clipStat.Key.Value,
-                            RawName = clipStat.Name,
-                            Added = stat.Added,
-                            Multi = stat.Multi,
-                            Scaled = stat.ValueFloat
-                        });
-                    }
-                }
+                    CollectStats(clipStats, stats, playerIndex, ref statScratch);
 
                 if (intrinsicsLookup.TryGetBuffer(player, out var intrinsics))
-                {
-                    var intrinsicMap = intrinsics.AsMap();
-                    var statMap = hasStats ? stats.AsMap() : default;
-                    foreach (var clipIntrinsic in clipIntrinsics)
-                    {
-                        var current = intrinsicMap.TryGetValue(clipIntrinsic.Key, out var value) ? value : 0;
-                        var min = clipIntrinsic.Min;
-                        var max = clipIntrinsic.Max;
+                    CollectIntrinsics(clipIntrinsics, intrinsics, hasStats, stats, playerIndex, ref intrinsicScratch);
 
-                        if (hasStats)
-                        {
-                            if (clipIntrinsic.MinStat.Value != 0 &&
-                                statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
-                                min = (int)math.floor(minStat.Value);
-                            if (clipIntrinsic.MaxStat.Value != 0 &&
-                                statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
-                                max = (int)math.floor(maxStat.Value);
-                        }
-
-                        intrinsicScratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
-                        {
-                            Player = playerIndex,
-                            Key = clipIntrinsic.Key.Value,
-                            RawName = clipIntrinsic.Name,
-                            Current = current,
-                            Min = min,
-                            Max = max
-                        });
-                    }
-                }
-
-                for (var i = activeEvents.Length - 1; i >= 0; i--)
-                {
-                    var active = activeEvents[i];
-                    active.TimeRemaining -= dt;
-                    if (active.TimeRemaining <= 0f)
-                        activeEvents.RemoveAtSwapBack(i);
-                    else
-                        activeEvents[i] = active;
-                }
+                DecayActiveEvents(activeEvents, dt);
 
                 if (eventsLookup.TryGetBuffer(player, out var conditionEvents))
-                {
-                    var eventMap = conditionEvents.AsMap();
-                    foreach (var clipEvent in clipEvents)
-                    {
-                        if (!eventMap.TryGetValue(clipEvent.Key, out var amount))
-                            continue;
-
-                        var refreshed = false;
-                        for (var i = 0; i < activeEvents.Length; i++)
-                            if (activeEvents[i].Key.Equals(clipEvent.Key))
-                            {
-                                var ev = activeEvents[i];
-                                ev.Value = amount;
-                                ev.TimeRemaining = clipEvent.Duration;
-                                ev.Duration = clipEvent.Duration;
-                                activeEvents[i] = ev;
-                                refreshed = true;
-                                break;
-                            }
-
-                        if (!refreshed)
-                            activeEvents.Add(new ActiveUIEvent
-                            {
-                                Key = clipEvent.Key,
-                                Name = clipEvent.Name,
-                                Value = amount,
-                                TimeRemaining = clipEvent.Duration,
-                                Duration = clipEvent.Duration
-                            });
-                    }
-                }
+                    RefreshActiveEvents(clipEvents, conditionEvents, activeEvents);
 
                 foreach (var active in activeEvents)
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
@@ -221,6 +137,117 @@ namespace BovineLabs.Timeline.UI
             data.Stats = statScratch;
             data.Intrinsics = intrinsicScratch;
             data.Events = eventScratch;
+        }
+
+        private static void CollectStats(
+            DynamicBuffer<ClipStat> clipStats, DynamicBuffer<Stat> stats, int playerIndex,
+            ref NativeList<EssenceUIViewModel.Data.StatRow> scratch)
+        {
+            var statMap = stats.AsMap();
+            foreach (var clipStat in clipStats)
+            {
+                if (!statMap.TryGetValue(clipStat.Key, out var stat))
+                    continue;
+
+                scratch.Add(new EssenceUIViewModel.Data.StatRow
+                {
+                    Player = playerIndex,
+                    Key = clipStat.Key.Value,
+                    RawName = clipStat.Name,
+                    Added = stat.Added,
+                    Multi = stat.Multi,
+                    Scaled = stat.ValueFloat
+                });
+            }
+        }
+
+        private static void CollectIntrinsics(
+            DynamicBuffer<ClipIntrinsic> clipIntrinsics, DynamicBuffer<Intrinsic> intrinsics,
+            bool hasStats, DynamicBuffer<Stat> stats, int playerIndex,
+            ref NativeList<EssenceUIViewModel.Data.IntrinsicRow> scratch)
+        {
+            var intrinsicMap = intrinsics.AsMap();
+            var statMap = hasStats ? stats.AsMap() : default;
+            foreach (var clipIntrinsic in clipIntrinsics)
+            {
+                var current = intrinsicMap.TryGetValue(clipIntrinsic.Key, out var value) ? value : 0;
+                var min = clipIntrinsic.Min;
+                var max = clipIntrinsic.Max;
+
+                if (hasStats)
+                {
+                    if (clipIntrinsic.MinStat.Value != 0 &&
+                        statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
+                        min = (int)math.floor(minStat.Value);
+                    if (clipIntrinsic.MaxStat.Value != 0 &&
+                        statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
+                        max = (int)math.floor(maxStat.Value);
+                }
+
+                scratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
+                {
+                    Player = playerIndex,
+                    Key = clipIntrinsic.Key.Value,
+                    RawName = clipIntrinsic.Name,
+                    Current = current,
+                    Min = min,
+                    Max = max
+                });
+            }
+        }
+
+        private static void DecayActiveEvents(DynamicBuffer<ActiveUIEvent> activeEvents, float dt)
+        {
+            for (var i = activeEvents.Length - 1; i >= 0; i--)
+            {
+                var active = activeEvents[i];
+                active.TimeRemaining -= dt;
+                if (active.TimeRemaining <= 0f)
+                    activeEvents.RemoveAtSwapBack(i);
+                else
+                    activeEvents[i] = active;
+            }
+        }
+
+        private static void RefreshActiveEvents(
+            DynamicBuffer<ClipEvent> clipEvents, DynamicBuffer<ConditionEvent> conditionEvents,
+            DynamicBuffer<ActiveUIEvent> activeEvents)
+        {
+            var eventMap = conditionEvents.AsMap();
+            foreach (var clipEvent in clipEvents)
+            {
+                if (!eventMap.TryGetValue(clipEvent.Key, out var amount))
+                    continue;
+
+                if (TryRefreshExisting(activeEvents, clipEvent, amount))
+                    continue;
+
+                activeEvents.Add(new ActiveUIEvent
+                {
+                    Key = clipEvent.Key,
+                    Name = clipEvent.Name,
+                    Value = amount,
+                    TimeRemaining = clipEvent.Duration,
+                    Duration = clipEvent.Duration
+                });
+            }
+        }
+
+        private static bool TryRefreshExisting(
+            DynamicBuffer<ActiveUIEvent> activeEvents, ClipEvent clipEvent, int amount)
+        {
+            for (var i = 0; i < activeEvents.Length; i++)
+                if (activeEvents[i].Key.Equals(clipEvent.Key))
+                {
+                    var ev = activeEvents[i];
+                    ev.Value = amount;
+                    ev.TimeRemaining = clipEvent.Duration;
+                    ev.Duration = clipEvent.Duration;
+                    activeEvents[i] = ev;
+                    return true;
+                }
+
+            return false;
         }
     }
 }

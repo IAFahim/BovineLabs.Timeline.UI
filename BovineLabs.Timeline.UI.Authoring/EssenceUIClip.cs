@@ -28,7 +28,22 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public override void Bake(Entity clipEntity, BakingContext context)
         {
-            // Register the referenced schema assets so a change to any re-triggers baking.
+            RegisterDependencies(context);
+
+            context.Baker.AddComponent(clipEntity, Source.ToComponent());
+
+            BakeStats(clipEntity, context);
+            BakeIntrinsics(clipEntity, context);
+            BakeEvents(clipEntity, context);
+
+            context.Baker.AddBuffer<ActiveUIEvent>(clipEntity);
+
+            base.Bake(clipEntity, context);
+        }
+
+        // Register the referenced schema assets so a change to any re-triggers baking.
+        private void RegisterDependencies(BakingContext context)
+        {
             context.Baker.DependsOn(Source.Link);
             if (Stats != null)
                 foreach (var s in Stats)
@@ -39,36 +54,45 @@ namespace BovineLabs.Timeline.UI.Authoring
             if (Events != null)
                 foreach (var e in Events)
                     context.Baker.DependsOn(e.Event);
+        }
 
-            context.Baker.AddComponent(clipEntity, Source.ToComponent());
-
+        private void BakeStats(Entity clipEntity, BakingContext context)
+        {
             var statBuffer = context.Baker.AddBuffer<ClipStat>(clipEntity);
-            if (Stats != null)
-                foreach (var s in Stats)
-                    if (s != null)
-                        statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
+            if (Stats == null)
+                return;
 
+            foreach (var s in Stats)
+                if (s != null)
+                    statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
+        }
+
+        private void BakeIntrinsics(Entity clipEntity, BakingContext context)
+        {
             var intBuffer = context.Baker.AddBuffer<ClipIntrinsic>(clipEntity);
-            if (Intrinsics != null)
-                foreach (var i in Intrinsics)
-                    if (i != null)
-                        intBuffer.Add(new ClipIntrinsic
-                        {
-                            Key = i.Key, Name = i.name,
-                            Min = i.Range.x, Max = i.Range.y,
-                            MinStat = i.MinStat, MaxStat = i.MaxStat
-                        });
+            if (Intrinsics == null)
+                return;
 
+            foreach (var i in Intrinsics)
+                if (i != null)
+                    intBuffer.Add(new ClipIntrinsic
+                    {
+                        Key = i.Key, Name = i.name,
+                        Min = i.Range.x, Max = i.Range.y,
+                        MinStat = i.MinStat, MaxStat = i.MaxStat
+                    });
+        }
+
+        private void BakeEvents(Entity clipEntity, BakingContext context)
+        {
             var evBuffer = context.Baker.AddBuffer<ClipEvent>(clipEntity);
-            if (Events != null)
-                foreach (var e in Events)
-                    if (e.Event != null)
-                        evBuffer.Add(new ClipEvent
-                            { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
+            if (Events == null)
+                return;
 
-            context.Baker.AddBuffer<ActiveUIEvent>(clipEntity);
-
-            base.Bake(clipEntity, context);
+            foreach (var e in Events)
+                if (e.Event != null)
+                    evBuffer.Add(new ClipEvent
+                        { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
         }
     }
 }
