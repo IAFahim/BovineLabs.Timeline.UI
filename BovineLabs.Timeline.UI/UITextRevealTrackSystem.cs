@@ -53,7 +53,11 @@ namespace BovineLabs.Timeline.UI
             var duration = (transform.End.Value - transform.Start.Value) * transform.Scale;
             var elapsed = time.Value.Value - transform.ClipIn.Value;
             var percent = duration > 0 ? math.clamp(elapsed / duration, 0.0, 1.0) : 1.0;
-            var visible = (int)math.round(full.Length * percent);
+            var visible = math.clamp((int)math.round(full.Length * percent), 0, full.Length);
+
+            // Never cut between a UTF-16 surrogate pair (emoji / non-BMP), which would emit a lone
+            // high surrogate and render as a broken glyph. Advance to the next full code point.
+            if (visible > 0 && visible < full.Length && char.IsHighSurrogate(full[visible - 1])) visible++;
 
             inverse.Element.text = full.Substring(0, visible);
         }

@@ -2,6 +2,7 @@ using System;
 using BovineLabs.Reaction.Data.Core;
 using BovineLabs.Timeline.EntityLinks.Authoring;
 using BovineLabs.Timeline.UI.Data;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace BovineLabs.Timeline.UI.Authoring
@@ -17,7 +18,7 @@ namespace BovineLabs.Timeline.UI.Authoring
     {
         public UISourceMode Mode;
 
-        [Min(0)] public int Player;
+        [Range(0, UISource.NoPlayer - 1)] public int Player;
 
         public Target Route;
 
@@ -25,9 +26,11 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public readonly UISource ToComponent()
         {
+            var player = (byte)math.clamp(this.Player, 0, UISource.NoPlayer - 1);
+
             return new UISource
             {
-                Player = Mode == UISourceMode.Player ? (byte)Player : UISource.NoPlayer,
+                Player = Mode == UISourceMode.Player ? player : UISource.NoPlayer,
                 Route = Route,
                 LinkKey = Link
             };

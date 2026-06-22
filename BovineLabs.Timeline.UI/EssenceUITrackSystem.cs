@@ -121,6 +121,12 @@ namespace BovineLabs.Timeline.UI
                     RefreshActiveEvents(clipEvents, conditionEvents, activeEvents);
 
                 foreach (var active in activeEvents)
+                {
+                    // Skip duplicates: overlapping active clips resolving to the same player can each
+                    // emit the same (player, key), which would render the event row N times.
+                    if (ContainsEvent(eventScratch, playerIndex, active.Key.Value))
+                        continue;
+
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {
                         Player = playerIndex,
@@ -130,6 +136,7 @@ namespace BovineLabs.Timeline.UI
                         TimeRemaining = active.TimeRemaining,
                         Duration = active.Duration
                     });
+                }
             }
 
             ref var data = ref uiHelper.Binding;
@@ -147,6 +154,11 @@ namespace BovineLabs.Timeline.UI
             foreach (var clipStat in clipStats)
             {
                 if (!statMap.TryGetValue(clipStat.Key, out var stat))
+                    continue;
+
+                // Skip duplicates: overlapping active clips resolving to the same player can list the
+                // same stat, which would render the row N times.
+                if (ContainsStat(scratch, playerIndex, clipStat.Key.Value))
                     continue;
 
                 scratch.Add(new EssenceUIViewModel.Data.StatRow
@@ -183,6 +195,11 @@ namespace BovineLabs.Timeline.UI
                         statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
                         max = (int)math.floor(maxStat.Value);
                 }
+
+                // Skip duplicates: overlapping active clips resolving to the same player can list the
+                // same intrinsic, which would render the row N times.
+                if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
+                    continue;
 
                 scratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
                 {
@@ -246,6 +263,36 @@ namespace BovineLabs.Timeline.UI
                     activeEvents[i] = ev;
                     return true;
                 }
+
+            return false;
+        }
+
+        private static bool ContainsStat(
+            NativeList<EssenceUIViewModel.Data.StatRow> scratch, int player, ushort key)
+        {
+            for (var i = 0; i < scratch.Length; i++)
+                if (scratch[i].Player == player && scratch[i].Key == key)
+                    return true;
+
+            return false;
+        }
+
+        private static bool ContainsIntrinsic(
+            NativeList<EssenceUIViewModel.Data.IntrinsicRow> scratch, int player, ushort key)
+        {
+            for (var i = 0; i < scratch.Length; i++)
+                if (scratch[i].Player == player && scratch[i].Key == key)
+                    return true;
+
+            return false;
+        }
+
+        private static bool ContainsEvent(
+            NativeList<EssenceUIViewModel.Data.EventRow> scratch, int player, int key)
+        {
+            for (var i = 0; i < scratch.Length; i++)
+                if (scratch[i].Player == player && scratch[i].Key == key)
+                    return true;
 
             return false;
         }

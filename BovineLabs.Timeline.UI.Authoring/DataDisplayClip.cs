@@ -2,6 +2,7 @@ using System;
 using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Timeline.Authoring;
 using BovineLabs.Timeline.UI.Data;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 using UnityEngine.Timeline;
@@ -26,7 +27,11 @@ namespace BovineLabs.Timeline.UI.Authoring
                 {
                     context.Baker.DependsOn(schema);
                     if (schema is IUID uid)
-                        buffer.Add(new ClipDataId { Id = uid.ID, Label = schema.name });
+                    {
+                        var label = default(Unity.Collections.FixedString32Bytes);
+                        label.CopyFromTruncated(schema.name);
+                        buffer.Add(new ClipDataId { Id = uid.ID, Label = label });
+                    }
                 }
 
             base.Bake(clipEntity, context);

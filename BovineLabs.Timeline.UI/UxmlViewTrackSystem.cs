@@ -1,5 +1,6 @@
 using BovineLabs.Anchor;
 using BovineLabs.Anchor.Services;
+using BovineLabs.Core;
 using BovineLabs.Timeline.UI.Data;
 using Unity.Entities;
 using UnityEngine.UIElements;
@@ -43,6 +44,12 @@ namespace BovineLabs.Timeline.UI
             var target = data.TargetId.IsEmpty ? null : root.Q(data.TargetId.ToString());
             if (target == null)
             {
+                if (!data.TargetId.IsEmpty)
+                {
+                    BLGlobalLogger.LogWarningString(
+                        $"UxmlView: TargetId '{data.TargetId.ToString()}' not found under root; attaching to root.");
+                }
+
                 root.Add(view);
                 return;
             }

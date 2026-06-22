@@ -89,11 +89,21 @@ namespace BovineLabs.Timeline.UI
             for (var i = 0; i < entities.Length; i++)
             {
                 var d = data[i];
-                if (TryApply(root, entities[i], in d, out var inverse)) outstanding[entities[i]] = inverse;
+
+                // Only mark the entity done (add TCleanup, which removes it from enteredQuery) once the
+                // target actually resolves. If TryApply fails this frame the entity stays in the query and
+                // is retried next frame, so an effect whose VisualElement is built a frame late is not
+                // permanently disabled.
+                if (TryApply(root, entities[i], in d, out var inverse))
+                {
+                    outstanding[entities[i]] = inverse;
+                    ecb.AddComponent<TCleanup>(entities[i]);
+                }
                 else
+                {
                     BLGlobalLogger.LogWarningString(
                         $"{GetType().Name}: unresolved target for {entities[i].ToFixedString()}.");
-                ecb.AddComponent<TCleanup>(entities[i]);
+                }
             }
 
             ecb.Playback(EntityManager);

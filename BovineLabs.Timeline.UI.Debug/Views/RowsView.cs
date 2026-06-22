@@ -50,12 +50,17 @@ namespace BovineLabs.Timeline.UI.Debug.Views
 
         private void BindRow(VisualElement element, int index)
         {
-            // AnchorGridView sets element.dataSource = itemsSource[index] (the Row),
-            // so UXML bindings on the template resolve Label/Value against the Row.
-            // We use bindItem to handle IsVisible toggles on the row container itself.
+            // AppUI's GridView does not set a per-item dataSource, so there is no UXML
+            // binding to resolve Label/Value against the Row. Populate both columns explicitly.
+            var row = ViewModel.Value.Rows[index];
+
+            if (element.Q<Text>("label") is { } label)
+            {
+                label.text = row.Label;
+            }
+
             if (element.Q<Text>("detail") is { } detail)
             {
-                var row = ViewModel.Value.Rows[index];
                 detail.text = row.Value;
             }
         }
