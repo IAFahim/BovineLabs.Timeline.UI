@@ -12,7 +12,6 @@ using BovineLabs.Timeline.UI.Data.ViewModel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Mathematics;
 
 namespace BovineLabs.Timeline.UI
 {
@@ -177,18 +176,12 @@ namespace BovineLabs.Timeline.UI
             foreach (var clipIntrinsic in clipIntrinsics)
             {
                 var current = intrinsicMap.TryGetValue(clipIntrinsic.Key, out var value) ? value : 0;
-                var min = clipIntrinsic.Min;
-                var max = clipIntrinsic.Max;
 
-                if (hasStats)
-                {
-                    if (clipIntrinsic.MinStat.Value != 0 &&
-                        statMap.TryGetValue(clipIntrinsic.MinStat, out var minStat))
-                        min = (int)math.floor(minStat.Value);
-                    if (clipIntrinsic.MaxStat.Value != 0 &&
-                        statMap.TryGetValue(clipIntrinsic.MaxStat, out var maxStat))
-                        max = (int)math.floor(maxStat.Value);
-                }
+                var hasMinStat = TryResolveStat(in statMap, hasStats, clipIntrinsic.MinStat, out var minStatValue);
+                var hasMaxStat = TryResolveStat(in statMap, hasStats, clipIntrinsic.MaxStat, out var maxStatValue);
+
+                EssenceUIBounds.ResolveIntrinsicBounds(clipIntrinsic.Min, clipIntrinsic.Max,
+                    hasMinStat, minStatValue, hasMaxStat, maxStatValue, out var min, out var max);
 
                 if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
                     continue;
@@ -205,16 +198,33 @@ namespace BovineLabs.Timeline.UI
             }
         }
 
+        private static bool TryResolveStat(
+            in DynamicHashMap<StatKey, StatValue> statMap, bool hasStats, StatKey key, out float value)
+        {
+            if (hasStats && key.Value != 0 && statMap.TryGetValue(key, out var stat))
+            {
+                value = stat.Value;
+                return true;
+            }
+
+            value = 0f;
+            return false;
+        }
+
         private static void DecayActiveEvents(DynamicBuffer<ActiveUIEvent> activeEvents, float dt)
         {
             for (var i = activeEvents.Length - 1; i >= 0; i--)
             {
                 var active = activeEvents[i];
-                active.TimeRemaining -= dt;
-                if (active.TimeRemaining <= 0f)
+                if (EssenceUIDecay.TryDecay(active.TimeRemaining, dt, out var next))
+                {
                     activeEvents.RemoveAtSwapBack(i);
+                }
                 else
+                {
+                    active.TimeRemaining = next;
                     activeEvents[i] = active;
+                }
             }
         }
 

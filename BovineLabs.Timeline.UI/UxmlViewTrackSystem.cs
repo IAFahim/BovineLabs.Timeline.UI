@@ -42,26 +42,22 @@ namespace BovineLabs.Timeline.UI
         private static void Attach(VisualElement view, in UxmlViewData data, VisualElement root)
         {
             var target = data.TargetId.IsEmpty ? null : root.Q(data.TargetId.ToString());
-            if (target == null)
-            {
-                if (!data.TargetId.IsEmpty)
-                    BLGlobalLogger.LogWarningString(
-                        $"UxmlView: TargetId '{data.TargetId.ToString()}' not found under root; attaching to root.");
+            if (target == null && !data.TargetId.IsEmpty)
+                BLGlobalLogger.LogWarningString(
+                    $"UxmlView: TargetId '{data.TargetId.ToString()}' not found under root; attaching to root.");
 
-                root.Add(view);
-                return;
-            }
+            var hasTarget = target != null;
+            var hasParent = hasTarget && target.parent != null;
+            var targetIndex = hasParent ? target.parent.IndexOf(target) : 0;
+            var plan = UxmlAttach.PlanAttach(data.Mode, hasTarget, hasParent, targetIndex);
 
-            switch (data.Mode)
+            switch (plan.Op)
             {
-                case UxmlAttachmentMode.AppendToElement:
+                case AttachOp.AppendChild:
                     target.Add(view);
                     break;
-                case UxmlAttachmentMode.InsertBeforeElement when target.parent != null:
-                    target.parent.Insert(target.parent.IndexOf(target), view);
-                    break;
-                case UxmlAttachmentMode.InsertAfterElement when target.parent != null:
-                    target.parent.Insert(target.parent.IndexOf(target) + 1, view);
+                case AttachOp.InsertAt:
+                    target.parent.Insert(plan.Index, view);
                     break;
                 default:
                     root.Add(view);

@@ -1,7 +1,6 @@
 using BovineLabs.Timeline.Data;
 using BovineLabs.Timeline.UI.Data;
 using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine.UIElements;
 
 namespace BovineLabs.Timeline.UI
@@ -44,18 +43,9 @@ namespace BovineLabs.Timeline.UI
 
             var full = data.Text.ToString();
 
-            if (data.Mode == UITextRevealMode.Instant)
-            {
-                inverse.Element.text = full;
-                return;
-            }
-
-            var duration = (transform.End.Value - transform.Start.Value) * transform.Scale;
-            var elapsed = time.Value.Value - transform.ClipIn.Value;
-            var percent = duration > 0 ? math.clamp(elapsed / duration, 0.0, 1.0) : 1.0;
-            var visible = math.clamp((int)math.round(full.Length * percent), 0, full.Length);
-
-            if (visible > 0 && visible < full.Length && char.IsHighSurrogate(full[visible - 1])) visible++;
+            var visible = TextReveal.RevealedCount(full.Length, transform.Start.Value, transform.End.Value,
+                transform.Scale, transform.ClipIn.Value, time.Value.Value, data.Mode == UITextRevealMode.Instant);
+            visible = TextReveal.BumpHighSurrogate(full, visible);
 
             inverse.Element.text = full.Substring(0, visible);
         }

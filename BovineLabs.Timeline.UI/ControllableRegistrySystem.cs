@@ -40,7 +40,7 @@ namespace BovineLabs.Timeline.UI
                          .WithEntityAccess())
             {
                 var idx = player.ValueRO.Value;
-                if (byPlayer[idx] == Entity.Null || entity.Index < byPlayer[idx].Index) byPlayer[idx] = entity;
+                byPlayer[idx] = ControllableSelection.Select(byPlayer[idx], entity);
             }
 
             SystemAPI.GetSingletonRW<ControllableRegistry>().ValueRW.Version++;
