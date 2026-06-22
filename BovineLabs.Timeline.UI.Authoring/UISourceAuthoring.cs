@@ -26,7 +26,7 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         public readonly UISource ToComponent()
         {
-            var player = (byte)math.clamp(this.Player, 0, UISource.NoPlayer - 1);
+            var player = (byte)math.clamp(Player, 0, UISource.NoPlayer - 1);
 
             return new UISource
             {

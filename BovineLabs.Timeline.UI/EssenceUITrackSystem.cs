@@ -87,8 +87,6 @@ namespace BovineLabs.Timeline.UI
 
             state.Dependency.Complete();
 
-            // Reset per-clip event state once a clip is no longer active, so a re-activated clip does
-            // not replay the previous activation's events or resume already-expired fade timers.
             foreach (var staleEvents in SystemAPI.Query<DynamicBuffer<ActiveUIEvent>>().WithDisabled<ClipActive>())
                 if (staleEvents.Length > 0)
                     staleEvents.Clear();
@@ -122,8 +120,6 @@ namespace BovineLabs.Timeline.UI
 
                 foreach (var active in activeEvents)
                 {
-                    // Skip duplicates: overlapping active clips resolving to the same player can each
-                    // emit the same (player, key), which would render the event row N times.
                     if (ContainsEvent(eventScratch, playerIndex, active.Key.Value))
                         continue;
 
@@ -156,8 +152,6 @@ namespace BovineLabs.Timeline.UI
                 if (!statMap.TryGetValue(clipStat.Key, out var stat))
                     continue;
 
-                // Skip duplicates: overlapping active clips resolving to the same player can list the
-                // same stat, which would render the row N times.
                 if (ContainsStat(scratch, playerIndex, clipStat.Key.Value))
                     continue;
 
@@ -196,8 +190,6 @@ namespace BovineLabs.Timeline.UI
                         max = (int)math.floor(maxStat.Value);
                 }
 
-                // Skip duplicates: overlapping active clips resolving to the same player can list the
-                // same intrinsic, which would render the row N times.
                 if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
                     continue;
 

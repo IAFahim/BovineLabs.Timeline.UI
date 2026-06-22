@@ -45,10 +45,8 @@ namespace BovineLabs.Timeline.UI
             if (target == null)
             {
                 if (!data.TargetId.IsEmpty)
-                {
                     BLGlobalLogger.LogWarningString(
                         $"UxmlView: TargetId '{data.TargetId.ToString()}' not found under root; attaching to root.");
-                }
 
                 root.Add(view);
                 return;

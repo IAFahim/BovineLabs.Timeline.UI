@@ -1,7 +1,3 @@
-// <copyright file="RowsView.cs" company="BovineLabs">
-//     Copyright (c) BovineLabs. All rights reserved.
-// </copyright>
-
 using System;
 using System.ComponentModel;
 using BovineLabs.Anchor;
@@ -50,19 +46,11 @@ namespace BovineLabs.Timeline.UI.Debug.Views
 
         private void BindRow(VisualElement element, int index)
         {
-            // AppUI's GridView does not set a per-item dataSource, so there is no UXML
-            // binding to resolve Label/Value against the Row. Populate both columns explicitly.
             var row = ViewModel.Value.Rows[index];
 
-            if (element.Q<Text>("label") is { } label)
-            {
-                label.text = row.Label;
-            }
+            if (element.Q<Text>("label") is { } label) label.text = row.Label;
 
-            if (element.Q<Text>("detail") is { } detail)
-            {
-                detail.text = row.Value;
-            }
+            if (element.Q<Text>("detail") is { } detail) detail.text = row.Value;
         }
 
         private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)

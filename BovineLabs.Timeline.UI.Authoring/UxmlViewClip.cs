@@ -30,9 +30,6 @@ namespace BovineLabs.Timeline.UI.Authoring
             base.Bake(clipEntity, context);
         }
 
-        // The direct string->FixedString64Bytes assignment THROWS on overflow (not truncates), so the
-        // designer-facing warning never ran. CopyFromTruncated fits without throwing, then we compare to
-        // emit a clean truncation warning instead of an unhandled bake exception.
         private FixedString64Bytes Fit(string value, string fieldName)
         {
             var fs = new FixedString64Bytes();

@@ -28,7 +28,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                     context.Baker.DependsOn(schema);
                     if (schema is IUID uid)
                     {
-                        var label = default(Unity.Collections.FixedString32Bytes);
+                        var label = default(FixedString32Bytes);
                         label.CopyFromTruncated(schema.name);
                         buffer.Add(new ClipDataId { Id = uid.ID, Label = label });
                     }

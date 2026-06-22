@@ -32,8 +32,6 @@ namespace BovineLabs.Timeline.UI.Authoring
             base.Bake(clipEntity, context);
         }
 
-        // string->FixedString assignment THROWS on overflow; CopyFromTruncated fits without throwing so a
-        // clean truncation warning fires instead of an unhandled bake exception (see UxmlViewClip).
         private FixedString64Bytes Fit64(string value, string fieldName)
         {
             var fs = new FixedString64Bytes();
@@ -42,7 +40,9 @@ namespace BovineLabs.Timeline.UI.Authoring
 
             fs.CopyFromTruncated(value);
             if (fs.ToString() != value)
-                Debug.LogWarning($"UITextRevealClip '{name}' {fieldName} exceeds the FixedString64Bytes budget (61 bytes) and was truncated to \"{fs}\"; shorten it.", this);
+                Debug.LogWarning(
+                    $"UITextRevealClip '{name}' {fieldName} exceeds the FixedString64Bytes budget (61 bytes) and was truncated to \"{fs}\"; shorten it.",
+                    this);
             return fs;
         }
 
@@ -54,7 +54,9 @@ namespace BovineLabs.Timeline.UI.Authoring
 
             fs.CopyFromTruncated(value);
             if (fs.ToString() != value)
-                Debug.LogWarning($"UITextRevealClip '{name}' {fieldName} exceeds the FixedString512Bytes budget (509 bytes) and was truncated; shorten it.", this);
+                Debug.LogWarning(
+                    $"UITextRevealClip '{name}' {fieldName} exceeds the FixedString512Bytes budget (509 bytes) and was truncated; shorten it.",
+                    this);
             return fs;
         }
     }

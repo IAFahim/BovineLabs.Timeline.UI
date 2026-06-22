@@ -1,7 +1,3 @@
-// <copyright file="RowsTrackSystem.cs" company="BovineLabs">
-//     Copyright (c) BovineLabs. All rights reserved.
-// </copyright>
-
 using BovineLabs.Anchor;
 using BovineLabs.Timeline.Data;
 using BovineLabs.Timeline.UI.Data;

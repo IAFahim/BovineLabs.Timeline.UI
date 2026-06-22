@@ -41,7 +41,6 @@ namespace BovineLabs.Timeline.UI.Authoring
             base.Bake(clipEntity, context);
         }
 
-        // Register the referenced schema assets so a change to any re-triggers baking.
         private void RegisterDependencies(BakingContext context)
         {
             context.Baker.DependsOn(Source.Link);

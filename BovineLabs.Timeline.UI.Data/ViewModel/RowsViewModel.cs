@@ -1,7 +1,3 @@
-// <copyright file="RowsViewModel.cs" company="BovineLabs">
-//     Copyright (c) BovineLabs. All rights reserved.
-// </copyright>
-
 using System;
 using BovineLabs.Anchor;
 using Unity.Collections;
