@@ -1,7 +1,6 @@
 using System;
 using BovineLabs.Anchor;
 using Unity.Collections;
-using Unity.Mathematics;
 using Unity.Properties;
 
 namespace BovineLabs.Timeline.UI.Data.ViewModel
@@ -85,7 +84,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
                 [CreateProperty(ReadOnly = true)] public string Display => $"{Current} / {Max}";
 
                 [CreateProperty(ReadOnly = true)]
-                public float Fraction => Max > Min ? math.saturate((Current - (float)Min) / (Max - Min)) : 0f;
+                public float Fraction => UIFraction.Saturated(Current - (float)Min, Max - Min);
 
                 public bool Equals(IntrinsicRow other)
                 {
@@ -113,7 +112,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
                 [CreateProperty(ReadOnly = true)] public string Display => Amount.ToString();
 
                 [CreateProperty(ReadOnly = true)]
-                public float Fade => Duration > 0f ? math.saturate(TimeRemaining / Duration) : 0f;
+                public float Fade => UIFraction.Saturated(TimeRemaining, Duration);
 
                 public bool Equals(EventRow other)
                 {

@@ -4,7 +4,6 @@ using BovineLabs.Timeline.UI.Data;
 using BovineLabs.Timeline.UI.Data.ViewModel;
 using Unity.Burst;
 using Unity.Entities;
-using Unity.Mathematics;
 
 namespace BovineLabs.Timeline.UI
 {
@@ -42,8 +41,7 @@ namespace BovineLabs.Timeline.UI
 
             foreach (var number in SystemAPI.Query<RefRO<NumberComponent>>().WithAll<TimelineActive, ClipActive>())
             {
-                visible = true;
-                folded = math.max(folded, number.ValueRO.Value);
+                NumberFold.Accumulate(ref folded, ref visible, number.ValueRO.Value);
             }
 
             ref var data = ref uiHelper.Binding;

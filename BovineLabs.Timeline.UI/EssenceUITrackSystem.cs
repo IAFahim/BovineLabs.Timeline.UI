@@ -175,6 +175,9 @@ namespace BovineLabs.Timeline.UI
             var statMap = hasStats ? stats.AsMap() : default;
             foreach (var clipIntrinsic in clipIntrinsics)
             {
+                if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
+                    continue;
+
                 var current = intrinsicMap.TryGetValue(clipIntrinsic.Key, out var value) ? value : 0;
 
                 var hasMinStat = TryResolveStat(in statMap, hasStats, clipIntrinsic.MinStat, out var minStatValue);
@@ -182,9 +185,6 @@ namespace BovineLabs.Timeline.UI
 
                 EssenceUIBounds.ResolveIntrinsicBounds(clipIntrinsic.Min, clipIntrinsic.Max,
                     hasMinStat, minStatValue, hasMaxStat, maxStatValue, out var min, out var max);
-
-                if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
-                    continue;
 
                 scratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
                 {

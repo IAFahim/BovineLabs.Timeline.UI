@@ -58,14 +58,7 @@ namespace BovineLabs.Timeline.UI
 
                 foreach (var id in ids)
                 {
-                    var value = 0f;
-                    for (var i = 0; i < buffer.Length; i++)
-                        if (buffer[i].Id == id.Id)
-                        {
-                            value = buffer[i].Value;
-                            break;
-                        }
-
+                    var value = IdValueLookup.Resolve(buffer, id.Id);
                     scratch.Add(new DataDisplayViewModel.Data.Row { Id = id.Id, Name = id.Label, Value = value });
                 }
             }
