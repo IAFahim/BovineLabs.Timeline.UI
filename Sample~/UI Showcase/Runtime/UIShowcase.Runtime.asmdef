@@ -1,0 +1,21 @@
+{
+    "name": "UIShowcase.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "BovineLabs.Timeline.UI.Data",
+        "BovineLabs.Core",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Collections",
+        "Unity.Mathematics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

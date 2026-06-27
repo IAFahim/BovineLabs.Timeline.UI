@@ -31,5 +31,12 @@
   ],
   "documentationUrl": "Documentation~/com.bovinelabs.timeline.ui.md",
   "changelogUrl": "CHANGELOG.md",
-  "licensesUrl": "LICENSE.md"
+  "licensesUrl": "LICENSE.md",
+  "samples": [
+    {
+      "displayName": "UI Showcase",
+      "description": "All six BovineLabs.Timeline.UI track families: UxmlView, TextReveal, UssClass plus Number, DataDisplay and EssenceUI ViewModel panels.",
+      "path": "Sample~/UI Showcase"
+    }
+  ]
 }
