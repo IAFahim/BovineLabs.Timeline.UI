@@ -66,5 +66,15 @@ namespace BovineLabs.Timeline.UI.Data
         public byte KeepVisibleWhileNotFull;
         public byte ShowOnHealthChange;
         public byte FlashOnDamage;
+
+        // Trail behaviour (baked from BarFeedbackProfile; defaults when none) → HudBar.SetTrailConfig.
+        public byte TrailMode;
+        public byte Accumulate;
+        public byte Fade;
+        public byte DrainEase;
+        public float HoldMs;
+        public float DrainMs;
+        public float MinDrainMs;
+        public float MinChipFrac;
     }
 }

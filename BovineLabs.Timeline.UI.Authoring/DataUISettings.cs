@@ -125,6 +125,9 @@ namespace BovineLabs.Timeline.UI.Authoring
                     }
                 }
 
+                var prof = r.Bar != null ? r.Bar.feedback : null;
+                if (prof != null) baker.DependsOn(prof);
+
                 rows.Add(new UIBindingEntry
                 {
                     Slot = (byte)i,
@@ -148,6 +151,14 @@ namespace BovineLabs.Timeline.UI.Authoring
                     KeepVisibleWhileNotFull = B(r.KeepVisibleWhileNotFull),
                     ShowOnHealthChange = B(r.ShowOnHealthChange),
                     FlashOnDamage = B(r.FlashOnDamage),
+                    TrailMode = (byte)(prof != null ? (byte)prof.trailMode : (byte)TrailMode.Both),
+                    Accumulate = B(prof == null || prof.accumulate),
+                    Fade = B(prof == null || prof.fade),
+                    DrainEase = (byte)(prof != null ? (byte)prof.drainEase : (byte)EaseId.OutCubic),
+                    HoldMs = prof != null ? prof.holdMs : 400f,
+                    DrainMs = prof != null ? prof.drainMs : 500f,
+                    MinDrainMs = prof != null ? prof.minDrainMs : 120f,
+                    MinChipFrac = prof != null ? prof.minChipFrac : 0.005f,
                 });
             }
         }

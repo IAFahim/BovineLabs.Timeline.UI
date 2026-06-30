@@ -137,12 +137,12 @@ namespace BovineLabs.Timeline.UI
 
                 var show = alive && ready && (e.AlwaysVisible != 0 || (e.KeepVisibleWhileNotFull != 0 && fill < 0.999f) || math.abs(ghostFrac - fill) > 0.003f);
 
-                this.Push(panels, slot, show, math.saturate(fill), math.saturate(ghostFrac), math.saturate(lockedFrac), current, max, e.Label, e.Format);
+                this.Push(panels, slot, show, math.saturate(fill), math.saturate(ghostFrac), math.saturate(lockedFrac), current, max, e.Label, e.Format, in e);
             }
         }
 
         private void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool show,
-            float fill, float ghostFrac, float lockedFrac, float current, float max, FixedString64Bytes label, FixedString64Bytes format)
+            float fill, float ghostFrac, float lockedFrac, float current, float max, FixedString64Bytes label, FixedString64Bytes format, in UIBindingEntry e)
         {
             // Value text computed ONCE and GUARDED — a pure renderer must never throw on a designer's malformed Format.
             var valueText = string.Empty;
@@ -184,6 +184,7 @@ namespace BovineLabs.Timeline.UI
                 if (panel.Q($"bar-{slot}") is HudBar bar)
                 {
                     saw = true;
+                    bar.SetTrailConfig((TrailMode)e.TrailMode, e.Accumulate != 0, e.HoldMs, e.DrainMs, e.MinDrainMs, (EaseId)e.DrainEase, e.Fade != 0, e.MinChipFrac);
                     bar.value = fill; // set BEFORE AddChip — the chip top = live fill + amount
                     bar.ghost = ghostFrac;
                     bar.locked = lockedFrac;

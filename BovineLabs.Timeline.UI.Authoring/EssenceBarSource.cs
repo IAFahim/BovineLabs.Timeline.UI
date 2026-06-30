@@ -36,5 +36,10 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         [Header("Flash")]
         public float flashDecay = 0.25f;
+
+        [Header("Trail behaviour (optional)")]
+        [Tooltip("Shared feedback profile — drop-chip/slider toggle, accumulate, hold, collapse ease/rate, fade. " +
+                 "None = sensible defaults. The SAME asset drives both the world bar and the HUD.")]
+        public BarFeedbackProfile feedback;
     }
 }
