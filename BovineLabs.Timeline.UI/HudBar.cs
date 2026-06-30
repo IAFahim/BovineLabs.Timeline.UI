@@ -42,9 +42,8 @@ namespace BovineLabs.Timeline.UI
 
         // Accumulating chip trail (TOLD via AddChip; held then eased-collapse). Config is set by the driver from the profile.
         private float m_ChipHi;
-        private float m_ChipFade = 1f;
-        private float m_ChipDrop;
-        private TrailMode m_TrailMode = TrailMode.DropChip;
+        private bool m_Collapsing;
+        private TrailMode m_TrailMode = TrailMode.Both;
         private bool m_Accumulate = true;
         private bool m_Fade = true;
         private float m_HoldMs = 400f;
@@ -209,8 +208,9 @@ namespace BovineLabs.Timeline.UI
 
             this.m_Collapse?.Stop();
             this.m_Collapse = null;
-            this.m_ChipFade = 1f;
-            this.m_ChipDrop = 0f;
+            this.m_Collapsing = false;
+            this.chipClip.style.translate = new Translate(0f, 0f);
+            this.chipClip.style.opacity = 1f;
 
             var top = Saturate(this.m_Value + amountFrac);
             this.m_ChipHi = Saturate(this.m_Accumulate ? math.max(this.m_ChipHi, math.max(top, this.m_Value)) : top);
@@ -220,40 +220,37 @@ namespace BovineLabs.Timeline.UI
             this.ApplyChip();
         }
 
-        // The eased "swish": drain the held chip to the live fill (and, for DropChip, fall + fade) via UITK ValueAnimation.
+        // The "swish": the held chunk DETACHES and falls (frozen geometry, eased translate + fade) — a clean drop-off.
         private void Collapse()
         {
             this.m_HoldItem = null;
-            var from = this.m_ChipHi;
-            if (from <= this.m_Value + this.m_MinChipFrac)
+            if (this.m_ChipHi <= this.m_Value + this.m_MinChipFrac)
             {
                 this.m_ChipHi = this.m_Value;
                 this.ApplyChip();
                 return;
             }
 
+            // freeze the chip at its held window, then animate the fall (it is detached, so it does not track fill)
+            AnchorClip(this.chipClip, this.chipInner, Saturate(this.m_Value), Saturate(this.m_ChipHi), this.m_TrackWidth, this.m_RightToLeft);
+            this.chipClip.style.display = DisplayStyle.Flex;
+            this.m_Collapsing = true;
+
             var dur = (int)math.max(this.m_MinDrainMs, this.m_DrainMs);
+            var h = this.track.resolvedStyle.height;
+            h = h > 0f ? h : 20f;
             this.m_Collapse = this.experimental.animation.Start(0f, 1f, dur, (_, p) =>
             {
-                this.m_ChipHi = math.lerp(from, this.m_Value, p); // drain toward the LIVE fill
-                if (this.m_Fade)
-                {
-                    this.m_ChipFade = 1f - p;
-                }
-
-                if (this.m_TrailMode == TrailMode.DropChip)
-                {
-                    this.m_ChipDrop = p;
-                }
-
-                this.ApplyChip();
+                this.chipClip.style.translate = new Translate(0f, h * p * 1.4f);
+                this.chipClip.style.opacity = this.m_Fade ? 1f - p : 1f;
             }).Ease(VexEase.Get(this.m_DrainEase));
 
             this.m_Collapse.OnCompleted(() =>
             {
+                this.m_Collapsing = false;
                 this.m_ChipHi = this.m_Value;
-                this.m_ChipFade = 1f;
-                this.m_ChipDrop = 0f;
+                this.chipClip.style.translate = new Translate(0f, 0f);
+                this.chipClip.style.opacity = 1f;
                 this.ApplyChip();
             });
             this.m_Collapse.KeepAlive();
@@ -261,18 +258,18 @@ namespace BovineLabs.Timeline.UI
 
         private void ApplyChip()
         {
+            if (this.m_Collapsing)
+            {
+                return; // the detached chunk is mid-fall — its geometry is frozen
+            }
+
             var show = (this.m_TrailMode == TrailMode.DropChip || this.m_TrailMode == TrailMode.Both)
                 && (this.m_ChipHi - this.m_Value) > this.m_MinChipFrac;
             this.chipClip.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!show)
+            if (show)
             {
-                return;
+                AnchorClip(this.chipClip, this.chipInner, Saturate(this.m_Value), Saturate(this.m_ChipHi), this.m_TrackWidth, this.m_RightToLeft);
             }
-
-            AnchorClip(this.chipClip, this.chipInner, Saturate(this.m_Value), Saturate(this.m_ChipHi), this.m_TrackWidth, this.m_RightToLeft);
-            this.chipClip.style.opacity = this.m_ChipFade;
-            var h = this.track.resolvedStyle.height;
-            this.chipClip.style.translate = new Translate(0f, (h > 0f ? h : 20f) * this.m_ChipDrop * 1.6f);
         }
 
         // Position a [lo,hi] window over the blade: the clip spans [lo,hi]%, the inner is the FULL-width blade shifted so
