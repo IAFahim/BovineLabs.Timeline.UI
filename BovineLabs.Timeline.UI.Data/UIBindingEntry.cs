@@ -47,6 +47,7 @@ namespace BovineLabs.Timeline.UI.Data
         public UIValueKind MaxKind;
         public ushort MaxKey;     // optional denominator; 0 = none → plain readout
         public ushort GhostKey;   // optional explicit ghost source (FromStat/FromIntrinsic); kind follows GhostMode
+        public ushort LockedKey;  // optional intrinsic holding LOCKED health (curse) → hatched band, NEVER read as damage
 
         public UIRowKind Kind;
         public FixedString64Bytes Label;

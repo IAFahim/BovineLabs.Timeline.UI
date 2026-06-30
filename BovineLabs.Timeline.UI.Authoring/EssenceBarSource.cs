@@ -21,6 +21,10 @@ namespace BovineLabs.Timeline.UI.Authoring
         [Tooltip("Stat holding the MAX value (denominator). None = no max (plain readout).")]
         public StatSchemaObject max;
 
+        [Tooltip("Optional: intrinsic holding LOCKED health (e.g. a curse). Rendered as a hatched band at the high end; " +
+                 "a current drop under the lock is NEVER shown as damage — it's structure, read not inferred.")]
+        public IntrinsicSchemaObject locked;
+
         [Header("Ghost / chip")]
         public HudGhostMode ghostMode = HudGhostMode.ComputedLerp;
         [Tooltip("For GhostMode.FromIntrinsic.")]

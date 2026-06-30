@@ -55,7 +55,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 // the world bar uses — single source of truth, no duplication). Number/Text rows with no source use the
                 // generic single Value below.
                 UIValueKind vKind, mKind;
-                ushort vKey, mKey, gKey;
+                ushort vKey, mKey, gKey, lockedKey;
                 HudGhostMode gMode;
                 float gDelay, gSpeed, fDecay;
 
@@ -78,6 +78,8 @@ namespace BovineLabs.Timeline.UI.Authoring
                     gDelay = r.Bar.ghostDelay;
                     gSpeed = r.Bar.ghostSpeed;
                     fDecay = r.Bar.flashDecay;
+                    if (r.Bar.locked != null) baker.DependsOn(r.Bar.locked);
+                    lockedKey = (ushort)(r.Bar.locked != null ? r.Bar.locked.Key : 0);
                 }
                 else
                 {
@@ -92,6 +94,35 @@ namespace BovineLabs.Timeline.UI.Authoring
                     gDelay = 0.4f;
                     gSpeed = 6f;
                     fDecay = 0.25f;
+                    lockedKey = 0;
+                }
+
+                // Bake-time diagnostics — surface silent misconfigurations ONCE instead of a blank bar at runtime.
+                if (r.Source.Mode == UISourceMode.Binding)
+                {
+                    UnityEngine.Debug.LogError($"[DataUI] Row {i} ('{r.Label}'): Source Mode is Binding — a HUD row has no bound self, so it never resolves and stays hidden. Set Mode = Player.");
+                }
+
+                if (r.Bar != null && r.Bar.max == null)
+                {
+                    UnityEngine.Debug.LogWarning($"[DataUI] Row {i} ('{r.Label}'): the shared source has no Max stat — the bar renders empty until one is assigned.");
+                }
+
+                if (r.Bar == null && r.Value is ConditionEventObject)
+                {
+                    UnityEngine.Debug.LogWarning($"[DataUI] Row {i} ('{r.Label}'): Event-kind readouts read a per-frame-cleared buffer from presentation and show 0 — use an Intrinsic/Stat value instead.");
+                }
+
+                if (!string.IsNullOrEmpty(r.Format))
+                {
+                    try
+                    {
+                        _ = string.Format(r.Format, 0, 0);
+                    }
+                    catch (System.FormatException)
+                    {
+                        UnityEngine.Debug.LogError($"[DataUI] Row {i} ('{r.Label}'): Format '{r.Format}' is invalid — use '{{0}}' (current) / '{{1}}' (max).");
+                    }
                 }
 
                 rows.Add(new UIBindingEntry
@@ -103,6 +134,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                     MaxKind = mKind,
                     MaxKey = mKey,
                     GhostKey = gKey,
+                    LockedKey = lockedKey,
                     Kind = r.Kind,
                     Label = Clip(r.Label),
                     Format = Clip(r.Format),

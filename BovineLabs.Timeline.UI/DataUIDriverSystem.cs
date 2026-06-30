@@ -14,14 +14,11 @@ using UnityEngine.UIElements;
 namespace BovineLabs.Timeline.UI
 {
     /// <summary>
-    /// The ONE generic data-UI driver. For every baked <see cref="UIBindingEntry"/> it resolves the source entity (via
-    /// the generic <see cref="UISourceResolver"/>), reads ANY Essence value by kind+key (+ optional max + ghost), runs
-    /// the shared <see cref="HudBarMath"/> for bar rows, and pushes the result onto NAMED elements of the mounted UXML
-    /// panel(s): a <see cref="HudBar"/> named <c>bar-{slot}</c>, labels <c>name-{slot}</c> / <c>value-{slot}</c>, and a
-    /// container <c>card-{slot}</c> (shown/hidden by Alive). Nothing here is health-specific, and the designer only
-    /// authors the UXML (named elements + structure) + USS (all styling). Direct element push is used because UITK
-    /// runtime DataBinding (data-source-type) does not resolve reliably in this Anchor setup. NOT [BurstCompile]:
-    /// touches the managed <see cref="AnchorApp.Current"/>.
+    /// The ONE generic data-UI driver — a DUMB renderer. It infers NOTHING. Each frame it reads the durable STRUCTURE
+    /// values the game passes (current intrinsic, max stat, optional ghost-slider value, optional locked channel) and
+    /// pushes them as geometry onto the mounted UXML elements (bar-/name-/value-/card-{slot}). The ghost slider's lag is
+    /// driven by the game (a <see cref="BarGhost"/> value); the UI just renders it. No deltas, no decisions.
+    /// Not [BurstCompile]: touches managed <see cref="AnchorApp.Current"/>.
     /// </summary>
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     [WorldSystemFilter(
@@ -30,22 +27,23 @@ namespace BovineLabs.Timeline.UI
         WorldSystemFilterFlags.Presentation)]
     public partial struct DataUIDriverSystem : ISystem
     {
-        private const int MaxRows = 64;
         public const string PanelClass = "vex-hud";
-
-        private NativeArray<RowRuntime> runtime;
-        private ulong warnedMissingMask; // slots already warned about a missing card-/bar- element (survives per-frame reset)
 
         private UnsafeComponentLookup<Targets> targetsLookup;
         private UnsafeComponentLookup<EntityLinkSource> sourcesLookup;
         private UnsafeBufferLookup<EntityLinkEntry> linksLookup;
+        private ComponentLookup<BarGhost> ghostLookup;
+        private NativeList<float> chipScratch;
+        private ulong warnedMissingMask;
+        private ulong warnedBadFormatMask;
 
         public void OnCreate(ref SystemState state)
         {
-            this.runtime = new NativeArray<RowRuntime>(MaxRows, Allocator.Persistent);
             this.targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
             this.sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
             this.linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
+            this.ghostLookup = state.GetComponentLookup<BarGhost>(true);
+            this.chipScratch = new NativeList<float>(16, Allocator.Persistent);
 
             state.RequireForUpdate<DataUITag>();
             state.RequireForUpdate<ControllableRegistry>();
@@ -53,7 +51,7 @@ namespace BovineLabs.Timeline.UI
 
         public void OnDestroy(ref SystemState state)
         {
-            this.runtime.Dispose();
+            this.chipScratch.Dispose();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -64,43 +62,39 @@ namespace BovineLabs.Timeline.UI
                 return;
             }
 
-            // Every mounted data-UI panel (a UXML whose root carries the .vex-hud class). None yet → nothing to do.
             var panels = app.RootVisualElement.Query(className: PanelClass).Build().ToList();
             if (panels.Count == 0)
             {
                 return;
             }
 
-            var dt = math.min((float)SystemAPI.Time.DeltaTime, 0.1f);
-
             var entries = SystemAPI.GetSingletonBuffer<UIBindingEntry>(true);
             var players = SystemAPI.GetSingleton<ControllableRegistry>();
             var intrinsics = SystemAPI.GetBufferLookup<Intrinsic>(true);
             var stats = SystemAPI.GetBufferLookup<Stat>(true);
             var events = SystemAPI.GetBufferLookup<ConditionEvent>(true);
+            var feedback = SystemAPI.GetBufferLookup<BarFeedbackEvent>(false);
 
             this.targetsLookup.Update(ref state);
             this.sourcesLookup.Update(ref state);
             this.linksLookup.Update(ref state);
+            this.ghostLookup.Update(ref state);
             state.Dependency.Complete();
 
             for (var i = 0; i < entries.Length; i++)
             {
                 var e = entries[i];
-                var slot = (byte)math.min(e.Slot, MaxRows - 1);
+                var slot = e.Slot; // real index for element lookups; only the warn-mask shift is 64-guarded below
 
                 var alive = UISourceResolver.TryResolve(
                     e.Source, Entity.Null, players, this.targetsLookup, this.sourcesLookup, this.linksLookup, out var entity)
                     && entity != Entity.Null;
 
-                float fill = 0f, ghost = 0f, flash = 0f, current = 0f, max = 0f;
-                var show = alive; // the driver only SIGNALS visibility; USS owns the look via the .is-hidden class
+                float fill = 0f, ghostFrac = 0f, lockedFrac = 0f, current = 0f, max = 0f;
+                var ready = false; // a Bar row is "ready" only once its max denominator exists — else it's a false-empty bar
+                this.chipScratch.Clear();
 
-                if (!alive)
-                {
-                    this.runtime[slot] = default;
-                }
-                else
+                if (alive)
                 {
                     var hasIntr = intrinsics.TryGetBuffer(entity, out var intrBuf);
                     var hasStat = stats.TryGetBuffer(entity, out var statBuf);
@@ -108,72 +102,95 @@ namespace BovineLabs.Timeline.UI
 
                     current = ReadValue(e.ValueKind, e.ValueKey, intrBuf, hasIntr, statBuf, hasStat, evBuf, hasEvent);
                     max = e.MaxKey != 0 ? ReadValue(e.MaxKind, e.MaxKey, intrBuf, hasIntr, statBuf, hasStat, evBuf, hasEvent) : 0f;
+                    current = math.select(0f, current, math.isfinite(current)); // dumb renderer trusts clean structure; sanitize once
+                    max = math.select(0f, max, math.isfinite(max));
+                    ready = e.MaxKey == 0 || max > 0f;
                     fill = HudBarMath.Fill(current, max);
-                    ghost = fill;
 
-                    var rt = this.runtime[slot];
-                    if (e.Kind == UIRowKind.Bar)
+                    // ghost slider: a value the GAME passes (lags/leads); the UI just renders it. Default = fill (no band).
+                    ghostFrac = fill;
+                    if (this.ghostLookup.TryGetComponent(entity, out var bg) && max > 0f)
                     {
-                        var externalGhost = ExternalGhost(in e, intrBuf, hasIntr, statBuf, hasStat, max);
-                        var rawCurrent = (int)math.round(current);
-                        if (rt.Warmed == 0)
-                        {
-                            rt.Warmed = 1;
-                            rt.Ghost = fill;
-                            rt.LastSeenRaw = rawCurrent;
-                            rt.IdleTime = e.AutoHideDelay;
-                        }
-                        else
-                        {
-                            var changed = rawCurrent != rt.LastSeenRaw;
-                            var damaged = rawCurrent < rt.LastSeenRaw;
-                            if (changed) rt.VisLatch = 0;
-                            HudBarMath.GhostStep(e.GhostMode, fill, externalGhost, damaged, dt, e.GhostDelay, e.GhostSpeed, ref rt.Ghost, ref rt.GhostHoldTimer);
-                            rt.Flash = HudBarMath.Flash(e.FlashOnDamage != 0, damaged, rt.Flash, dt, e.FlashDecay);
-                            rt.IdleTime = changed ? 0f : rt.IdleTime + dt;
-                            rt.LastSeenRaw = rawCurrent;
-                        }
-
-                        ghost = rt.Ghost;
-                        flash = rt.Flash;
-
-                        // Binary visibility decision from the config knobs (alwaysVisible / keep-while-not-full /
-                        // show-on-change + auto-hide). USS does the actual fade. alwaysVisible → always true → no .is-hidden.
-                        show = HudBarMath.TargetAlpha(e.AlwaysVisible != 0, rt.VisLatch, e.KeepVisibleWhileNotFull != 0,
-                            e.ShowOnHealthChange != 0, fill, rt.IdleTime, e.AutoHideDelay) > 0.5f;
+                        ghostFrac = math.saturate(bg.Value / max);
                     }
 
-                    this.runtime[slot] = rt;
+                    if (e.LockedKey != 0 && hasIntr)
+                    {
+                        var locked = intrBuf.GetValue((IntrinsicKey)e.LockedKey, 0);
+                        lockedFrac = max > 0f ? math.saturate(locked / max) : 0f;
+                    }
+
+                    // FEEDBACK inbox → chip amounts (drain once, then clear). Damage is TOLD, never inferred.
+                    if (max > 0f && feedback.TryGetBuffer(entity, out var fb) && fb.Length > 0)
+                    {
+                        for (var k = 0; k < fb.Length; k++)
+                        {
+                            if (fb[k].Kind == FeedbackKind.DamageChip)
+                            {
+                                this.chipScratch.Add(math.abs(fb[k].Amount) / max);
+                            }
+                        }
+
+                        fb.Clear();
+                    }
                 }
 
-                // Designer-trap guard: a baked row whose slot has no matching card-/bar- element renders nothing. Warn once.
-                if ((this.warnedMissingMask & (1UL << slot)) == 0 &&
-                    panels[0].Q($"card-{slot}") == null && panels[0].Q($"bar-{slot}") == null)
-                {
-                    this.warnedMissingMask |= 1UL << slot;
-                    UnityEngine.Debug.LogWarning($"[DataUI] Row slot {slot} ('{e.Label}') has no 'card-{slot}'/'bar-{slot}' element in the mounted UXML — it renders nothing. Add the card block or remove the row.");
-                }
+                var show = alive && ready && (e.AlwaysVisible != 0 || (e.KeepVisibleWhileNotFull != 0 && fill < 0.999f) || math.abs(ghostFrac - fill) > 0.003f);
 
-                Push(panels, slot, show, math.saturate(fill), math.saturate(ghost), math.saturate(flash), current, max, e.Label, e.Format);
+                this.Push(panels, slot, show, math.saturate(fill), math.saturate(ghostFrac), math.saturate(lockedFrac), current, max, e.Label, e.Format);
             }
         }
 
-        // Push one row onto every mounted panel's named elements. Data (bar fill/ghost/flash + text) is pushed; the
-        // visibility STATE is signalled as a USS class (.is-hidden) so USS owns the show/hide/fade look.
-        private static void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool show,
-            float fill, float ghost, float flash, float current, float max, FixedString64Bytes label, FixedString64Bytes format)
+        private void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool show,
+            float fill, float ghostFrac, float lockedFrac, float current, float max, FixedString64Bytes label, FixedString64Bytes format)
         {
+            // Value text computed ONCE and GUARDED — a pure renderer must never throw on a designer's malformed Format.
+            var valueText = string.Empty;
+            if (show)
+            {
+                if (!format.IsEmpty)
+                {
+                    try
+                    {
+                        valueText = string.Format(format.ToString(), (int)math.round(current), (int)math.round(max));
+                    }
+                    catch (System.FormatException)
+                    {
+                        valueText = AutoText(current, max);
+                        if (slot < 64 && (this.warnedBadFormatMask & (1UL << slot)) == 0)
+                        {
+                            this.warnedBadFormatMask |= 1UL << slot;
+                            UnityEngine.Debug.LogWarning($"[DataUI] Row {slot} ('{label}') Format '{format}' is invalid — using default. Use '{{0}}' (current) / '{{1}}' (max).");
+                        }
+                    }
+                }
+                else
+                {
+                    valueText = AutoText(current, max);
+                }
+            }
+
+            var saw = false;
             for (var p = 0; p < panels.Count; p++)
             {
                 var panel = panels[p];
 
-                panel.Q($"card-{slot}")?.EnableInClassList("is-hidden", !show);
+                if (panel.Q($"card-{slot}") is { } card)
+                {
+                    saw = true;
+                    card.EnableInClassList("is-hidden", !show);
+                }
 
                 if (panel.Q($"bar-{slot}") is HudBar bar)
                 {
-                    bar.value = fill;
-                    bar.ghost = ghost;
-                    bar.flash = flash;
+                    saw = true;
+                    bar.value = fill; // set BEFORE AddChip — the chip top = live fill + amount
+                    bar.ghost = ghostFrac;
+                    bar.locked = lockedFrac;
+                    for (var k = 0; k < this.chipScratch.Length; k++)
+                    {
+                        bar.AddChip(this.chipScratch[k]);
+                    }
                 }
 
                 if (panel.Q<Label>($"name-{slot}") is { } nameLabel)
@@ -183,12 +200,19 @@ namespace BovineLabs.Timeline.UI
 
                 if (panel.Q<Label>($"value-{slot}") is { } valueLabel)
                 {
-                    valueLabel.text = !show ? string.Empty
-                        : !format.IsEmpty ? string.Format(format.ToString(), (int)math.round(current), (int)math.round(max))
-                        : max > 0f ? $"{(int)math.round(current)} / {(int)math.round(max)}" : ((int)math.round(current)).ToString();
+                    valueLabel.text = valueText;
                 }
             }
+
+            if (!saw && slot < 64 && (this.warnedMissingMask & (1UL << slot)) == 0)
+            {
+                this.warnedMissingMask |= 1UL << slot;
+                UnityEngine.Debug.LogWarning($"[DataUI] Row slot {slot} ('{label}') has no 'card-{slot}'/'bar-{slot}' element in the mounted UXML.");
+            }
         }
+
+        private static string AutoText(float current, float max) =>
+            max > 0f ? $"{(int)math.round(current)} / {(int)math.round(max)}" : ((int)math.round(current)).ToString();
 
         private static float ReadValue(UIValueKind kind, ushort key,
             in DynamicBuffer<Intrinsic> intr, bool hasIntr, in DynamicBuffer<Stat> st, bool hasStat,
@@ -203,38 +227,6 @@ namespace BovineLabs.Timeline.UI
                 default:
                     return hasIntr ? intr.GetValue((IntrinsicKey)key, 0) : 0f;
             }
-        }
-
-        private static float ExternalGhost(in UIBindingEntry e,
-            in DynamicBuffer<Intrinsic> intr, bool hasIntr, in DynamicBuffer<Stat> st, bool hasStat, float max)
-        {
-            if (e.GhostKey == 0)
-            {
-                return 0f;
-            }
-
-            if (e.GhostMode == HudGhostMode.FromStat)
-            {
-                return HudBarMath.Fill(hasStat ? st.GetValueFloat((StatKey)e.GhostKey, 0f) : 0f, max);
-            }
-
-            if (e.GhostMode == HudGhostMode.FromIntrinsic)
-            {
-                return HudBarMath.Fill(hasIntr ? intr.GetValue((IntrinsicKey)e.GhostKey, 0) : 0, max);
-            }
-
-            return 0f;
-        }
-
-        private struct RowRuntime
-        {
-            public float Ghost;
-            public float GhostHoldTimer;
-            public float IdleTime;
-            public float Flash;
-            public int LastSeenRaw;
-            public byte Warmed;
-            public byte VisLatch;
         }
     }
 }
