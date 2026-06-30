@@ -109,25 +109,6 @@ namespace BovineLabs.Timeline.UI.Data
             return notFull || recentlyChanged ? 1f : 0f;
         }
 
-        /// <summary>Move alpha toward target over fadeIn (rising) / fadeOut (falling) seconds.</summary>
-        public static float StepAlpha(float alpha, float target, float fadeIn, float fadeOut, float dt)
-        {
-            var dur = target > alpha ? fadeIn : fadeOut;
-            var step = dur <= 1e-4f ? 1f : dt / dur;
-            return MoveTowards(alpha, target, step);
-        }
-
-        public static float MoveTowards(float a, float b, float maxDelta)
-        {
-            var diff = b - a;
-            if (math.abs(diff) <= maxDelta)
-            {
-                return b;
-            }
-
-            return a + math.sign(diff) * maxDelta;
-        }
-
         /// <summary>Low-health alpha throb (multiplier ~[1-amp, 1]); phase advances only while low. 1 when not low.</summary>
         public static float LowPulse(float fill, float pulseThreshold, float pulseAmp, float pulseSpeed, float time)
         {

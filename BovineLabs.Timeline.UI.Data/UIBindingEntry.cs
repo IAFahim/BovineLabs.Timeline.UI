@@ -46,27 +46,22 @@ namespace BovineLabs.Timeline.UI.Data
         public ushort ValueKey;   // numerator (current)
         public UIValueKind MaxKind;
         public ushort MaxKey;     // optional denominator; 0 = none → plain readout
-        public UIValueKind GhostKind;
-        public ushort GhostKey;   // optional explicit ghost source (FromStat/FromIntrinsic)
+        public ushort GhostKey;   // optional explicit ghost source (FromStat/FromIntrinsic); kind follows GhostMode
 
         public UIRowKind Kind;
         public FixedString64Bytes Label;
         public FixedString64Bytes Format; // e.g. "{0:0} / {1:0}"; empty = auto
         public FixedString64Bytes Class;  // optional USS class hook
 
-        // Per-row bar behaviour (mirrors the world bar; only meaningful for Kind == Bar).
+        // Bar dynamics — resolved from the shared EssenceBarSource (Kind == Bar only). USS owns fade + low-pulse.
         public HudGhostMode GhostMode;
         public float GhostDelay;
         public float GhostSpeed;
-        public float FadeInDuration;
-        public float FadeOutDuration;
-        public float AutoHideDelay;
         public float FlashDecay;
-        public float PulseAmp;
-        public float PulseSpeed;
-        public float PulseThreshold;
+
+        // Visibility logic (per-row / per-medium) → drives the .is-hidden USS class.
+        public float AutoHideDelay;
         public byte AlwaysVisible;
-        public byte StartVisible;
         public byte KeepVisibleWhileNotFull;
         public byte ShowOnHealthChange;
         public byte FlashOnDamage;

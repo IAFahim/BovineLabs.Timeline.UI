@@ -34,6 +34,7 @@ namespace BovineLabs.Timeline.UI
         public const string PanelClass = "vex-hud";
 
         private NativeArray<RowRuntime> runtime;
+        private ulong warnedMissingMask; // slots already warned about a missing card-/bar- element (survives per-frame reset)
 
         private UnsafeComponentLookup<Targets> targetsLookup;
         private UnsafeComponentLookup<EntityLinkSource> sourcesLookup;
@@ -71,7 +72,6 @@ namespace BovineLabs.Timeline.UI
             }
 
             var dt = math.min((float)SystemAPI.Time.DeltaTime, 0.1f);
-            var time = (float)SystemAPI.Time.ElapsedTime;
 
             var entries = SystemAPI.GetSingletonBuffer<UIBindingEntry>(true);
             var players = SystemAPI.GetSingleton<ControllableRegistry>();
@@ -93,7 +93,8 @@ namespace BovineLabs.Timeline.UI
                     e.Source, Entity.Null, players, this.targetsLookup, this.sourcesLookup, this.linksLookup, out var entity)
                     && entity != Entity.Null;
 
-                float fill = 0f, ghost = 0f, flash = 0f, alpha = 1f, current = 0f, max = 0f;
+                float fill = 0f, ghost = 0f, flash = 0f, current = 0f, max = 0f;
+                var show = alive; // the driver only SIGNALS visibility; USS owns the look via the .is-hidden class
 
                 if (!alive)
                 {
@@ -121,8 +122,6 @@ namespace BovineLabs.Timeline.UI
                             rt.Ghost = fill;
                             rt.LastSeenRaw = rawCurrent;
                             rt.IdleTime = e.AutoHideDelay;
-                            rt.Alpha = e.StartVisible != 0 ? 1f : HudBarMath.TargetAlpha(e.AlwaysVisible != 0, 0,
-                                e.KeepVisibleWhileNotFull != 0, e.ShowOnHealthChange != 0, fill, rt.IdleTime, e.AutoHideDelay);
                         }
                         else
                         {
@@ -132,44 +131,43 @@ namespace BovineLabs.Timeline.UI
                             HudBarMath.GhostStep(e.GhostMode, fill, externalGhost, damaged, dt, e.GhostDelay, e.GhostSpeed, ref rt.Ghost, ref rt.GhostHoldTimer);
                             rt.Flash = HudBarMath.Flash(e.FlashOnDamage != 0, damaged, rt.Flash, dt, e.FlashDecay);
                             rt.IdleTime = changed ? 0f : rt.IdleTime + dt;
-                            var target = HudBarMath.TargetAlpha(e.AlwaysVisible != 0, rt.VisLatch, e.KeepVisibleWhileNotFull != 0,
-                                e.ShowOnHealthChange != 0, fill, rt.IdleTime, e.AutoHideDelay);
-                            rt.Alpha = HudBarMath.StepAlpha(rt.Alpha, target, e.FadeInDuration, e.FadeOutDuration, dt);
                             rt.LastSeenRaw = rawCurrent;
                         }
 
                         ghost = rt.Ghost;
                         flash = rt.Flash;
-                        alpha = rt.Alpha * HudBarMath.LowPulse(fill, e.PulseThreshold, e.PulseAmp, e.PulseSpeed, time);
-                    }
-                    else
-                    {
-                        rt.Alpha = HudBarMath.StepAlpha(rt.Alpha, 1f, e.FadeInDuration, e.FadeOutDuration, dt);
-                        alpha = rt.Alpha;
+
+                        // Binary visibility decision from the config knobs (alwaysVisible / keep-while-not-full /
+                        // show-on-change + auto-hide). USS does the actual fade. alwaysVisible → always true → no .is-hidden.
+                        show = HudBarMath.TargetAlpha(e.AlwaysVisible != 0, rt.VisLatch, e.KeepVisibleWhileNotFull != 0,
+                            e.ShowOnHealthChange != 0, fill, rt.IdleTime, e.AutoHideDelay) > 0.5f;
                     }
 
                     this.runtime[slot] = rt;
                 }
 
-                Push(panels, slot, alive, math.saturate(fill), math.saturate(ghost), math.saturate(flash), math.saturate(alpha),
-                    current, max, e.Label);
+                // Designer-trap guard: a baked row whose slot has no matching card-/bar- element renders nothing. Warn once.
+                if ((this.warnedMissingMask & (1UL << slot)) == 0 &&
+                    panels[0].Q($"card-{slot}") == null && panels[0].Q($"bar-{slot}") == null)
+                {
+                    this.warnedMissingMask |= 1UL << slot;
+                    UnityEngine.Debug.LogWarning($"[DataUI] Row slot {slot} ('{e.Label}') has no 'card-{slot}'/'bar-{slot}' element in the mounted UXML — it renders nothing. Add the card block or remove the row.");
+                }
+
+                Push(panels, slot, show, math.saturate(fill), math.saturate(ghost), math.saturate(flash), current, max, e.Label, e.Format);
             }
         }
 
-        // Push one row onto every mounted panel's named elements (bar-{slot}, name-{slot}, value-{slot}, card-{slot}).
-        private static void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool alive,
-            float fill, float ghost, float flash, float alpha, float current, float max, FixedString64Bytes label)
+        // Push one row onto every mounted panel's named elements. Data (bar fill/ghost/flash + text) is pushed; the
+        // visibility STATE is signalled as a USS class (.is-hidden) so USS owns the show/hide/fade look.
+        private static void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool show,
+            float fill, float ghost, float flash, float current, float max, FixedString64Bytes label, FixedString64Bytes format)
         {
             for (var p = 0; p < panels.Count; p++)
             {
                 var panel = panels[p];
 
-                var card = panel.Q($"card-{slot}");
-                if (card != null)
-                {
-                    card.style.display = alive ? DisplayStyle.Flex : DisplayStyle.None;
-                    card.style.opacity = alpha;
-                }
+                panel.Q($"card-{slot}")?.EnableInClassList("is-hidden", !show);
 
                 if (panel.Q($"bar-{slot}") is HudBar bar)
                 {
@@ -185,9 +183,9 @@ namespace BovineLabs.Timeline.UI
 
                 if (panel.Q<Label>($"value-{slot}") is { } valueLabel)
                 {
-                    valueLabel.text = !alive ? string.Empty
-                        : max > 0f ? $"{(int)math.round(current)} / {(int)math.round(max)}"
-                        : ((int)math.round(current)).ToString();
+                    valueLabel.text = !show ? string.Empty
+                        : !format.IsEmpty ? string.Format(format.ToString(), (int)math.round(current), (int)math.round(max))
+                        : max > 0f ? $"{(int)math.round(current)} / {(int)math.round(max)}" : ((int)math.round(current)).ToString();
                 }
             }
         }
@@ -232,10 +230,8 @@ namespace BovineLabs.Timeline.UI
         {
             public float Ghost;
             public float GhostHoldTimer;
-            public float Alpha;
             public float IdleTime;
             public float Flash;
-            public float PrevFill;
             public int LastSeenRaw;
             public byte Warmed;
             public byte VisLatch;

@@ -48,38 +48,71 @@ namespace BovineLabs.Timeline.UI.Authoring
             {
                 var r = this.Rows[i];
 
-                // DependsOn EVERY managed ref so editing a schema/link re-bakes the SubScene.
-                if (r.Value != null) baker.DependsOn(r.Value);
-                if (r.Max != null) baker.DependsOn(r.Max);
-                if (r.Ghost != null) baker.DependsOn(r.Ghost);
+                // DependsOn EVERY managed ref so editing a schema/source/link re-bakes the SubScene.
                 if (r.Source.Link != null) baker.DependsOn(r.Source.Link);
+
+                // Bar rows take value/max/ghost + ghost/flash timing from the shared EssenceBarSource (the SAME asset
+                // the world bar uses — single source of truth, no duplication). Number/Text rows with no source use the
+                // generic single Value below.
+                UIValueKind vKind, mKind;
+                ushort vKey, mKey, gKey;
+                HudGhostMode gMode;
+                float gDelay, gSpeed, fDecay;
+
+                if (r.Bar != null)
+                {
+                    baker.DependsOn(r.Bar);
+                    if (r.Bar.current != null) baker.DependsOn(r.Bar.current);
+                    if (r.Bar.max != null) baker.DependsOn(r.Bar.max);
+                    if (r.Bar.ghostIntrinsic != null) baker.DependsOn(r.Bar.ghostIntrinsic);
+                    if (r.Bar.ghostStat != null) baker.DependsOn(r.Bar.ghostStat);
+
+                    vKind = UIValueKind.Intrinsic;
+                    vKey = (ushort)(r.Bar.current != null ? r.Bar.current.Key : 0);
+                    mKind = UIValueKind.Stat;
+                    mKey = (ushort)(r.Bar.max != null ? r.Bar.max.Key : 0);
+                    gMode = r.Bar.ghostMode;
+                    gKey = gMode == HudGhostMode.FromStat
+                        ? (ushort)(r.Bar.ghostStat != null ? r.Bar.ghostStat.Key : 0)
+                        : (ushort)(r.Bar.ghostIntrinsic != null ? r.Bar.ghostIntrinsic.Key : 0);
+                    gDelay = r.Bar.ghostDelay;
+                    gSpeed = r.Bar.ghostSpeed;
+                    fDecay = r.Bar.flashDecay;
+                }
+                else
+                {
+                    if (r.Value != null) baker.DependsOn(r.Value);
+
+                    vKind = KindOf(r.Value);
+                    vKey = KeyOf(r.Value);
+                    mKind = UIValueKind.Intrinsic;
+                    mKey = 0; // generic single readout — no max fraction
+                    gMode = HudGhostMode.Off;
+                    gKey = 0;
+                    gDelay = 0.4f;
+                    gSpeed = 6f;
+                    fDecay = 0.25f;
+                }
 
                 rows.Add(new UIBindingEntry
                 {
                     Slot = (byte)i,
                     Source = r.Source.ToComponent(),
-                    ValueKind = KindOf(r.Value),
-                    ValueKey = KeyOf(r.Value),
-                    MaxKind = KindOf(r.Max),
-                    MaxKey = KeyOf(r.Max),
-                    GhostKind = KindOf(r.Ghost),
-                    GhostKey = KeyOf(r.Ghost),
+                    ValueKind = vKind,
+                    ValueKey = vKey,
+                    MaxKind = mKind,
+                    MaxKey = mKey,
+                    GhostKey = gKey,
                     Kind = r.Kind,
                     Label = Clip(r.Label),
                     Format = Clip(r.Format),
                     Class = Clip(r.Class),
-                    GhostMode = r.GhostMode,
-                    GhostDelay = r.GhostDelay,
-                    GhostSpeed = r.GhostSpeed,
-                    FadeInDuration = r.FadeInDuration,
-                    FadeOutDuration = r.FadeOutDuration,
+                    GhostMode = gMode,
+                    GhostDelay = gDelay,
+                    GhostSpeed = gSpeed,
+                    FlashDecay = fDecay,
                     AutoHideDelay = r.AutoHideDelay,
-                    FlashDecay = r.FlashDecay,
-                    PulseAmp = r.PulseAmp,
-                    PulseSpeed = r.PulseSpeed,
-                    PulseThreshold = r.PulseThreshold,
                     AlwaysVisible = B(r.AlwaysVisible),
-                    StartVisible = B(r.StartVisible),
                     KeepVisibleWhileNotFull = B(r.KeepVisibleWhileNotFull),
                     ShowOnHealthChange = B(r.ShowOnHealthChange),
                     FlashOnDamage = B(r.FlashOnDamage),
@@ -107,15 +140,15 @@ namespace BovineLabs.Timeline.UI.Authoring
             [Tooltip("Who to read from (player index / route / link). Reuses the timeline UISource resolver.")]
             public UISourceAuthoring Source;
 
-            [Header("Data (any intrinsic / stat / event)")]
-            [Tooltip("The value to show (current). Intrinsic, Stat, or Event schema — anything, not just health.")]
+            [Header("What to show")]
+            [Tooltip("Bar rows: a shared EssenceBarSource — the SAME asset the world-space bar uses — supplies the " +
+                     "value/max/ghost + ghost/flash timing (single source of truth). Configure the data once, share it " +
+                     "world + screen.")]
+            public EssenceBarSource Bar;
+
+            [Tooltip("Number/Text rows only: the single value to show (Intrinsic / Stat / Event). Ignored when a shared " +
+                     "Bar source is set above. Use for one-off readouts (ammo, score, combo).")]
             public ConditionSchemaObject Value;
-
-            [Tooltip("Optional denominator (usually a Max stat). None = plain readout, no bar fraction.")]
-            public ConditionSchemaObject Max;
-
-            [Tooltip("Optional explicit ghost/chip source (for GhostMode FromStat/FromIntrinsic).")]
-            public ConditionSchemaObject Ghost;
 
             [Header("Presentation")]
             public UIRowKind Kind = UIRowKind.Bar;
@@ -125,21 +158,17 @@ namespace BovineLabs.Timeline.UI.Authoring
             [Tooltip("Optional USS class hook the designer can target.")]
             public string Class;
 
-            [Header("Bar behaviour (Kind = Bar only)")]
-            public HudGhostMode GhostMode = HudGhostMode.ComputedLerp;
-            public float GhostDelay = 0.4f;
-            public float GhostSpeed = 6f;
-            public float FadeInDuration = 0.15f;
-            public float FadeOutDuration = 0.4f;
-            public float AutoHideDelay = 3f;
-            public float FlashDecay = 0.25f;
-            public float PulseAmp = 0.5f;
-            public float PulseSpeed = 5f;
-            public float PulseThreshold = 0.3f;
+            // Visibility is the per-medium concern (USS owns the fade/colors); these only decide WHEN to add .is-hidden.
+            [Header("Visibility")]
+            [Tooltip("Always shown (no auto-hide). The common HUD case.")]
             public bool AlwaysVisible = true;
-            public bool StartVisible = true;
+            [Tooltip("Stay visible while the bar is not full (e.g. show damaged bars).")]
             public bool KeepVisibleWhileNotFull = true;
+            [Tooltip("Pop in when the value changes, then auto-hide after the delay.")]
             public bool ShowOnHealthChange = true;
+            [Tooltip("Seconds of no change before auto-hiding (when not Always Visible). 0 = never.")]
+            public float AutoHideDelay = 3f;
+            [Tooltip("Flash the bar on damage (flash timing comes from the shared source).")]
             public bool FlashOnDamage = true;
         }
     }

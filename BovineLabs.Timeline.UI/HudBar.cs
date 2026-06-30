@@ -1,4 +1,5 @@
 using Unity.Properties;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace BovineLabs.Timeline.UI
@@ -24,10 +25,14 @@ namespace BovineLabs.Timeline.UI
         private readonly VisualElement fillInner;
         private readonly VisualElement flashOverlay;
 
+        // USS-owned low-health tint (per-medium): the fill is lerped white→this as value drops below lowThreshold.
+        private static readonly CustomStyleProperty<Color> LowTintProp = new("--vex-low-tint");
+
         private float m_Value;
         private float m_Ghost;
         private float m_Flash;
-        private float m_LowThreshold = 0.3f;
+        private float m_LowThreshold = 0.5f;
+        private Color m_LowColor = new Color(1f, 0.35f, 0.27f, 1f);
         private bool m_RightToLeft;
 
         public HudBar()
@@ -50,13 +55,22 @@ namespace BovineLabs.Timeline.UI
             this.fillClip.Add(this.fillInner);
             this.track.Add(this.fillClip);
 
-            this.flashOverlay = Fill("vex-bar__flash");
-            this.track.Add(this.flashOverlay);
-
             // frame overlay (designer puts a frame background-image on .vex-bar__frame; empty otherwise).
             this.track.Add(Fill("vex-bar__frame"));
 
+            // flash sits ABOVE the frame so the whole silhouette (body + frame) whitens, matching the world bar order.
+            this.flashOverlay = Fill("vex-bar__flash");
+            this.track.Add(this.flashOverlay);
+
             this.RegisterCallback<GeometryChangedEvent>(_ => this.SyncInnerWidths());
+            this.RegisterCallback<CustomStyleResolvedEvent>(e =>
+            {
+                if (e.customStyle.TryGetValue(LowTintProp, out var c))
+                {
+                    this.m_LowColor = c;
+                    this.Apply();
+                }
+            });
             this.ApplyAnchors();
             this.Apply();
         }
@@ -165,6 +179,11 @@ namespace BovineLabs.Timeline.UI
             this.ghostClip.style.width = Length.Percent(Saturate(this.m_Ghost) * 100f);
             this.fillClip.style.width = Length.Percent(Saturate(this.m_Value) * 100f);
             this.flashOverlay.style.opacity = Saturate(this.m_Flash);
+
+            // Continuous low-health recolor (matches the world bar's per-fragment lerp): white (identity) at/above the
+            // threshold, lerping to the USS low tint as the fill drains. Keep the --low class as a coarse hook too.
+            var lowAmt = this.m_LowThreshold > 0f ? Saturate(1f - (this.m_Value / this.m_LowThreshold)) : 0f;
+            this.fillInner.style.unityBackgroundImageTintColor = Color.Lerp(Color.white, this.m_LowColor, lowAmt);
             this.EnableInClassList("vex-bar--low", this.m_LowThreshold > 0f && this.m_Value <= this.m_LowThreshold);
         }
 
