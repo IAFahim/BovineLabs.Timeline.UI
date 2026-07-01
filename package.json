@@ -37,6 +37,11 @@
       "displayName": "UI Showcase",
       "description": "All six BovineLabs.Timeline.UI track families: UxmlView, TextReveal, UssClass plus Number, DataDisplay and EssenceUI ViewModel panels.",
       "path": "Sample~/UI Showcase"
+    },
+    {
+      "displayName": "HUD Showcase",
+      "description": "Screen-space 4-player HUD driven by simulated combat events (CombatConductor) — damage chips, heal surges, ghost-slider drop-chip debris.",
+      "path": "Sample~/HUD Showcase"
     }
   ]
 }

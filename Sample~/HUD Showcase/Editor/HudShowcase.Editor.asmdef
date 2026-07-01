@@ -1,0 +1,28 @@
+{
+    "name": "BovineLabs.Timeline.UI.Sample.HudShowcase",
+    "references": [
+        "Vex.Preload.Editor",
+        "HudShowcase.Runtime",
+        "Vex.HealthBar",
+        "BovineLabs.Timeline.UI",
+        "BovineLabs.Timeline.UI.Authoring",
+        "BovineLabs.Timeline.UI.Data",
+        "BovineLabs.Essence.Authoring",
+        "BovineLabs.Essence.Data",
+        "BovineLabs.Timeline.PlayerInputs.Authoring",
+        "BovineLabs.Timeline.EntityLinks.Authoring",
+        "BovineLabs.Reaction.Authoring",
+        "BovineLabs.Reaction.Data",
+        "BovineLabs.Anchor",
+        "BovineLabs.Core",
+        "BovineLabs.Core.Editor",
+        "BovineLabs.Core.Authoring",
+        "Unity.Entities",
+        "Unity.Collections",
+        "Unity.Scenes"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "autoReferenced": false
+}

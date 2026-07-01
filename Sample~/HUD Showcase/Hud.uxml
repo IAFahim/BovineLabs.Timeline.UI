@@ -1,0 +1,50 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:hud="BovineLabs.Timeline.UI" editor-extension-mode="False">
+    <Style src="Hud.uss" />
+    <!-- The generic DataUIDriverSystem pushes each settings Row onto the NAMED elements below: card-{i} (shown/hidden),
+         bar-{i} (HudBar fill/ghost/flash), name-{i} / value-{i} (labels). To add a readout: add a Row in the
+         DataUISettings asset and copy a card here with the next index (card-4, bar-4, name-4, value-4), then style in USS.
+         All styling is in Hud.uss; structure here; no per-HUD code. -->
+    <ui:VisualElement class="vex-hud" picking-mode="Ignore">
+
+        <ui:VisualElement class="vex-hud__corner vex-hud__corner--tl" picking-mode="Ignore">
+            <ui:VisualElement name="card-0" class="vex-hud__card vex-hud__card--p0" picking-mode="Ignore">
+                <ui:VisualElement class="vex-hud__header" picking-mode="Ignore">
+                    <ui:Label name="name-0" class="vex-hud__name" picking-mode="Ignore" />
+                    <ui:Label name="value-0" class="vex-hud__value" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <hud:HudBar name="bar-0" class="vex-hud__bar" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="vex-hud__corner vex-hud__corner--tr" picking-mode="Ignore">
+            <ui:VisualElement name="card-1" class="vex-hud__card vex-hud__card--p1" picking-mode="Ignore">
+                <ui:VisualElement class="vex-hud__header" picking-mode="Ignore">
+                    <ui:Label name="name-1" class="vex-hud__name" picking-mode="Ignore" />
+                    <ui:Label name="value-1" class="vex-hud__value" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <hud:HudBar name="bar-1" class="vex-hud__bar" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="vex-hud__corner vex-hud__corner--bl" picking-mode="Ignore">
+            <ui:VisualElement name="card-2" class="vex-hud__card vex-hud__card--p2" picking-mode="Ignore">
+                <ui:VisualElement class="vex-hud__header" picking-mode="Ignore">
+                    <ui:Label name="name-2" class="vex-hud__name" picking-mode="Ignore" />
+                    <ui:Label name="value-2" class="vex-hud__value" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <hud:HudBar name="bar-2" class="vex-hud__bar" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement class="vex-hud__corner vex-hud__corner--br" picking-mode="Ignore">
+            <ui:VisualElement name="card-3" class="vex-hud__card vex-hud__card--p3" picking-mode="Ignore">
+                <ui:VisualElement class="vex-hud__header" picking-mode="Ignore">
+                    <ui:Label name="name-3" class="vex-hud__name" picking-mode="Ignore" />
+                    <ui:Label name="value-3" class="vex-hud__value" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <hud:HudBar name="bar-3" class="vex-hud__bar" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

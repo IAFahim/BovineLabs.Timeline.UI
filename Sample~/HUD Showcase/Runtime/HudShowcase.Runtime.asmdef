@@ -1,0 +1,17 @@
+{
+    "name": "HudShowcase.Runtime",
+    "references": [
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Unity.Burst",
+        "BovineLabs.Core",
+        "BovineLabs.Core.Extensions",
+        "BovineLabs.Reaction.Authoring",
+        "BovineLabs.Essence.Data",
+        "BovineLabs.Essence.Authoring",
+        "BovineLabs.Timeline.UI.Data"
+    ],
+    "autoReferenced": true
+}
