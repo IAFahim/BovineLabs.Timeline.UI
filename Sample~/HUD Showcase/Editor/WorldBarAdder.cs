@@ -13,7 +13,7 @@ namespace Vex.HudShowcase.Editor
     /// </summary>
     public static class WorldBarAdder
     {
-        private const string StylePath = "Assets/HealthBar/Styles/Player.asset";
+        private const string StylePath = "Packages/com.vex.healthbar/Runtime/Styles/Player.asset";
 
         [MenuItem("Showcase/Add World Bars To Open Scene")]
         public static void AddWorldBars()
