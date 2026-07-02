@@ -27,7 +27,7 @@ namespace BovineLabs.Timeline.UI
                 return false;
             }
 
-            inverse = new CapturedText(target, target.text);
+            inverse = new CapturedText(target, target.text, data.Text.ToString());
             return true;
         }
 
@@ -41,7 +41,10 @@ namespace BovineLabs.Timeline.UI
         {
             if (inverse.Element == null) return;
 
-            var full = data.Text.ToString();
+            // Use the string captured once at TryApply — data.Text.ToString() every frame was steady GC pressure.
+            // ponytail: the Substring below still allocs per frame; skipping it on unchanged count needs a mutable
+            // last-count written back through the base outstanding map — the per-frame ToString was the dominant cost.
+            var full = inverse.Full;
 
             var visible = TextReveal.RevealedCount(full.Length, transform.Start.Value, transform.End.Value,
                 transform.Scale, transform.ClipIn.Value, time.Value.Value, data.Mode == UITextRevealMode.Instant);
@@ -54,11 +57,13 @@ namespace BovineLabs.Timeline.UI
         {
             public readonly TextElement Element;
             public readonly string Original;
+            public readonly string Full;
 
-            public CapturedText(TextElement element, string original)
+            public CapturedText(TextElement element, string original, string full)
             {
                 Element = element;
                 Original = original;
+                Full = full;
             }
         }
     }
