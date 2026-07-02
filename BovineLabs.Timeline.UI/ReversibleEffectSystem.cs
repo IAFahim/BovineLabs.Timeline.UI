@@ -13,6 +13,7 @@ namespace BovineLabs.Timeline.UI
         where TCleanup : unmanaged, ICleanupComponentData
     {
         private readonly Dictionary<Entity, TInverse> outstanding = new();
+        private readonly HashSet<Entity> warned = new();
         private EntityQuery animatedQuery;
         private EntityQuery enteredQuery;
         private EntityQuery outstandingQuery;
@@ -63,6 +64,7 @@ namespace BovineLabs.Timeline.UI
         {
             foreach (var inverse in outstanding.Values) Revert(inverse);
             outstanding.Clear();
+            warned.Clear();
         }
 
         private void Exit()
@@ -86,6 +88,9 @@ namespace BovineLabs.Timeline.UI
             var entities = enteredQuery.ToEntityArray(Allocator.Temp);
             var data = enteredQuery.ToComponentDataArray<TData>(Allocator.Temp);
 
+            if (warned.Count > 0)
+                warned.IntersectWith(entities);
+
             for (var i = 0; i < entities.Length; i++)
             {
                 var d = data[i];
@@ -93,9 +98,10 @@ namespace BovineLabs.Timeline.UI
                 if (TryApply(root, entities[i], in d, out var inverse))
                 {
                     outstanding[entities[i]] = inverse;
+                    warned.Remove(entities[i]);
                     ecb.AddComponent<TCleanup>(entities[i]);
                 }
-                else
+                else if (warned.Add(entities[i]))
                 {
                     BLGlobalLogger.LogWarningString(
                         $"{GetType().Name}: unresolved target for {entities[i].ToFixedString()}.");

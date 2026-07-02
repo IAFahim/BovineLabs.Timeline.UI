@@ -121,13 +121,16 @@ namespace BovineLabs.Timeline.UI
                     }
 
                     // FEEDBACK inbox → chip amounts (drain once, then clear). Damage is TOLD, never inferred.
-                    if (max > 0f && feedback.TryGetBuffer(entity, out var fb) && fb.Length > 0)
+                    if (feedback.TryGetBuffer(entity, out var fb) && fb.Length > 0)
                     {
-                        for (var k = 0; k < fb.Length; k++)
+                        if (max > 0f)
                         {
-                            if (fb[k].Kind == FeedbackKind.DamageChip)
+                            for (var k = 0; k < fb.Length; k++)
                             {
-                                this.chipScratch.Add(math.abs(fb[k].Amount) / max);
+                                if (fb[k].Kind == FeedbackKind.DamageChip)
+                                {
+                                    this.chipScratch.Add(math.abs(fb[k].Amount) / max);
+                                }
                             }
                         }
 
