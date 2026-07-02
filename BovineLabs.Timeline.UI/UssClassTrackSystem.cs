@@ -25,25 +25,37 @@ namespace BovineLabs.Timeline.UI
             }
 
             var className = data.ClassName.ToString();
+            if (string.IsNullOrEmpty(className)) // AddToClassList("") throws
+            {
+                inverse = default;
+                return false;
+            }
+
+            // Only revert to removing the class if the clip actually added it — a class already present on the
+            // element (UXML-authored, or held by an overlapping clip) must survive this clip's exit.
+            var wasPresent = target.ClassListContains(className);
             target.AddToClassList(className);
-            inverse = new AppliedClass(target, className);
+            inverse = new AppliedClass(target, className, wasPresent);
             return true;
         }
 
         protected override void Revert(AppliedClass inverse)
         {
-            inverse.Element?.RemoveFromClassList(inverse.ClassName);
+            if (!inverse.WasPresent)
+                inverse.Element?.RemoveFromClassList(inverse.ClassName);
         }
 
         public readonly struct AppliedClass
         {
             public readonly VisualElement Element;
             public readonly string ClassName;
+            public readonly bool WasPresent;
 
-            public AppliedClass(VisualElement element, string className)
+            public AppliedClass(VisualElement element, string className, bool wasPresent)
             {
                 Element = element;
                 ClassName = className;
+                WasPresent = wasPresent;
             }
         }
     }
