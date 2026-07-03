@@ -1,4 +1,5 @@
 using BovineLabs.Reaction.Data.Core;
+using BovineLabs.Timeline.EntityLinks.Data;
 using Unity.Entities;
 
 namespace BovineLabs.Timeline.UI.Data
@@ -8,14 +9,12 @@ namespace BovineLabs.Timeline.UI.Data
         public const byte NoPlayer = byte.MaxValue;
 
         public byte Player;
-        public Target Route;
-        public ushort LinkKey;
+        public EntityLinkRef Link;
 
         public static readonly UISource Binding = new()
         {
             Player = NoPlayer,
-            Route = Target.Self,
-            LinkKey = 0
+            Link = new EntityLinkRef { ReadRootFrom = Target.Self, LinkKey = 0 },
         };
     }
 }

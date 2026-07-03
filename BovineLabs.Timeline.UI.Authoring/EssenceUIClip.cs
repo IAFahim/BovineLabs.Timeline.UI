@@ -30,7 +30,7 @@ namespace BovineLabs.Timeline.UI.Authoring
         {
             RegisterDependencies(context);
 
-            context.Baker.AddComponent(clipEntity, Source.ToComponent());
+            context.Baker.AddComponent(clipEntity, Source.ToComponent(context.Baker));
 
             BakeStats(clipEntity, context);
             BakeIntrinsics(clipEntity, context);
@@ -43,7 +43,7 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         private void RegisterDependencies(BakingContext context)
         {
-            context.Baker.DependsOn(Source.Link);
+            context.Baker.DependsOn(Source.link);
             if (Stats != null)
                 foreach (var s in Stats)
                     context.Baker.DependsOn(s);

@@ -65,7 +65,11 @@ namespace BovineLabs.Timeline.UI.Tests
 
         private static UISource Source(Target route)
         {
-            return new UISource { Player = UISource.NoPlayer, Route = route, LinkKey = 0 };
+            return new UISource
+            {
+                Player = UISource.NoPlayer,
+                Link = new EntityLinkRef { ReadRootFrom = route, LinkKey = 0 },
+            };
         }
 
         private (bool ok, Entity resolved) Resolve(UISource source, Entity self)

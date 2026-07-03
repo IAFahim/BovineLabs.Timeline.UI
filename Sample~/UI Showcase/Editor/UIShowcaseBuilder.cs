@@ -446,7 +446,7 @@ public static class UIShowcaseBuilder
             Mode = UISourceMode.Player,
             Player = 0,
             Route = TargetSlot.Self,
-            Link = null,
+            link = null,
         };
         a.Stats = new[] { maxHealth, movementSpeed };
         a.Intrinsics = new[] { currentHealth, goldenOrbs };

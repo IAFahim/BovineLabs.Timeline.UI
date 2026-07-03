@@ -144,7 +144,7 @@ namespace Vex.HudShowcase.Editor
             {
                 settings.Rows.Add(new DataUISettings.Entry
                 {
-                    Source = new UISourceAuthoring { Mode = UISourceMode.Player, Player = i, Route = Target.Self, Link = essenceLink },
+                    Source = new UISourceAuthoring { Mode = UISourceMode.Player, Player = i, Route = Target.Self, link = essenceLink },
                     Bar = barSource, // the SHARED source the world bar can also use
                     Kind = UIRowKind.Bar,
                     Label = $"P{i + 1}",

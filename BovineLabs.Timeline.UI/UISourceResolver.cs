@@ -27,37 +27,19 @@ namespace BovineLabs.Timeline.UI
                 return false;
             }
 
-            Entity roled;
-            if (source.Route is Target.Self or Target.None)
+            // frame is default(Targets) (all-null slots) when seed has no Targets component — matches the old
+            // "return false" path for a real slot route (Targets.Get on the empty frame yields Entity.Null).
+            targets.TryGetComponent(seed, out var frame);
+
+            // Preserve the historical semantics: this resolver has always treated Target.None like Target.Self
+            // (resolve from the seed itself). Targets.Get maps None => Null, so coerce it on a local copy.
+            var link = source.Link;
+            if (link.ReadRootFrom == Target.None)
             {
-                roled = seed;
-            }
-            else if (targets.TryGetComponent(seed, out var frame))
-            {
-                roled = frame.Get(source.Route, seed);
-            }
-            else
-            {
-                resolved = Entity.Null;
-                return false;
+                link.ReadRootFrom = Target.Self;
             }
 
-            if (roled == Entity.Null)
-            {
-                resolved = Entity.Null;
-                return false;
-            }
-
-            if (source.LinkKey == 0)
-            {
-                resolved = roled;
-                return true;
-            }
-
-            resolved = EntityLinkResolver.TryResolve(roled, source.LinkKey, sources, links, out var linked)
-                ? linked
-                : roled;
-            return true;
+            return link.TryResolve(seed, frame, sources, links, out resolved);
         }
     }
 }

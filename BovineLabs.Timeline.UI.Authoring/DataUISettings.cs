@@ -49,7 +49,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 var r = this.Rows[i];
 
                 // DependsOn EVERY managed ref so editing a schema/source/link re-bakes the SubScene.
-                if (r.Source.Link != null) baker.DependsOn(r.Source.Link);
+                if (r.Source.link != null) baker.DependsOn(r.Source.link);
 
                 // Bar rows take value/max/ghost + ghost/flash timing from the shared EssenceBarSource (the SAME asset
                 // the world bar uses — single source of truth, no duplication). Number/Text rows with no source use the
@@ -131,7 +131,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 rows.Add(new UIBindingEntry
                 {
                     Slot = (byte)i,
-                    Source = r.Source.ToComponent(),
+                    Source = r.Source.ToComponent(baker),
                     ValueKind = vKind,
                     ValueKey = vKey,
                     MaxKind = mKind,
