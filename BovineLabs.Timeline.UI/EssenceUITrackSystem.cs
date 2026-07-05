@@ -235,8 +235,10 @@ namespace BovineLabs.Timeline.UI
             var eventMap = conditionEvents.AsMap();
             foreach (var clipEvent in clipEvents)
             {
-                if (!eventMap.TryGetValue(clipEvent.Key, out var amount))
+                if (!eventMap.TryGetValue(clipEvent.Key, out var amountPayload))
                     continue;
+
+                var amount = amountPayload.Read<int>();
 
                 if (TryRefreshExisting(activeEvents, clipEvent, amount))
                     continue;
