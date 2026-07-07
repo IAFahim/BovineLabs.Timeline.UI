@@ -231,7 +231,8 @@ namespace BovineLabs.Timeline.UI.Authoring
             public bool KeepVisibleWhileNotFull = true;
             [Tooltip("Pop in when the value changes, then auto-hide after the delay.")]
             public bool ShowOnHealthChange = true;
-            [Tooltip("Seconds of no change before auto-hiding (when not Always Visible). 0 = never.")]
+            [Tooltip("Seconds of no change before auto-hiding (when not Always Visible). 0 = never. Unscaled " +
+                     "wall-clock seconds: time-scale does not stretch the delay and pause freezes it (UI clock).")]
             public float AutoHideDelay = 3f;
             [Tooltip("Flash the bar on damage (flash timing comes from the shared source).")]
             public bool FlashOnDamage = true;

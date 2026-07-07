@@ -12,6 +12,9 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine.UIElements;
+#if !BL_DISABLE_PAUSE
+using BovineLabs.Core.Pause;
+#endif
 
 namespace BovineLabs.Timeline.UI
 {
@@ -56,6 +59,13 @@ namespace BovineLabs.Timeline.UI
         private readonly List<VisualElement> currentPanels = new();
         private readonly List<PanelCache> panelCaches = new();
 
+        // Clock policy (TODO.md item 13): the driver forwards the built-in bl-core pause state to every HudBar so the
+        // scheduler-driven chip hold/collapse freezes while paused. PauseGame lives on a system entity → IncludeSystems.
+#if !BL_DISABLE_PAUSE
+        private EntityQuery pauseQuery;
+#endif
+        private bool paused;
+
         protected override void OnCreate()
         {
             ref var state = ref this.CheckedStateRef;
@@ -66,6 +76,13 @@ namespace BovineLabs.Timeline.UI
             this.chipScratch = new NativeList<float>(16, Allocator.Persistent);
             this.warnedMissing = new bool[256];
             this.warnedBadFormat = new bool[256];
+
+#if !BL_DISABLE_PAUSE
+            using var pauseBuilder = new EntityQueryBuilder(Allocator.Temp)
+                .WithAll<PauseGame>()
+                .WithOptions(EntityQueryOptions.IncludeSystems);
+            this.pauseQuery = pauseBuilder.Build(ref state);
+#endif
 
             this.RequireForUpdate<DataUITag>();
             this.RequireForUpdate<ControllableRegistry>();
@@ -134,7 +151,17 @@ namespace BovineLabs.Timeline.UI
             this.EnsureSlots(entries.Length);
 
             var currentFrame = SystemAPI.TryGetSingleton<BarFeedbackFrame>(out var bff) ? bff.Frame : 0u;
-            var dt = math.min((float)SystemAPI.Time.DeltaTime, 0.1f); // clamp hitch so ghost/flash catch-up stays sane
+
+            // Clock policy (TODO.md item 13 — RESOLVED): kernel dt (ghost catch-up, flash decay, idle/auto-hide) is the
+            // UNSCALED presentation clock, so bullet-time no longer slows HUD feedback and pause freezes it (0 while
+            // paused). Fallback: the old clamped scaled step for worlds without the clock system (tests).
+            var dt = SystemAPI.TryGetSingleton<UIUnscaledTime>(out var uiTime)
+                ? uiTime.DeltaTime
+                : math.min((float)SystemAPI.Time.DeltaTime, UIClock.MaxStep);
+
+#if !BL_DISABLE_PAUSE
+            this.paused = !this.pauseQuery.IsEmptyIgnoreFilter;
+#endif
 
             for (var i = 0; i < entries.Length; i++)
             {
@@ -261,6 +288,14 @@ namespace BovineLabs.Timeline.UI
 
                 if (se.Bar != null)
                 {
+                    // Pause freeze is change-driven per slot (SetPaused early-outs, but skip the call storm anyway).
+                    if (!se.PauseApplied || se.LastPaused != this.paused)
+                    {
+                        se.Bar.SetPaused(this.paused);
+                        se.LastPaused = this.paused;
+                        se.PauseApplied = true;
+                    }
+
                     if (!se.ConfigApplied)
                     {
                         // Config is bake-static → SetTrailConfig ONCE per cache build, not every frame.
@@ -486,6 +521,8 @@ namespace BovineLabs.Timeline.UI
             public int LastMax = int.MinValue;
             public bool LastShow;
             public bool ConfigApplied;
+            public bool LastPaused;
+            public bool PauseApplied; // first push always forwards the pause state, then change-only
             public bool Primed; // first push writes every channel unconditionally, then change-only
         }
     }

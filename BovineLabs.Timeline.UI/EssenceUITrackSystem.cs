@@ -79,10 +79,13 @@ namespace BovineLabs.Timeline.UI
             intrinsicScratch.Clear();
             eventScratch.Clear();
 
-            // TODO.md item 13: HUD feedback decays on game time. Clamp the step so a frame hitch
-            // (or a resumed-from-pause spike) can't expire a multi-second toast in a single frame.
-            // Full scaled-vs-unscaled clock policy is still owed — see ActiveUIEvent.TimeRemaining.
-            var decayDt = math.min(SystemAPI.Time.DeltaTime, 0.1f);
+            // TODO.md item 13 (clock policy — RESOLVED): toasts decay on the UNSCALED presentation clock published
+            // by UIUnscaledClockSystem, so WorldTimeScale bullet-time no longer stretches a 2 s toast to 20 s and
+            // game pause freezes it (the clock publishes 0 while PauseGame is active). Fallback: the old clamped
+            // scaled step for worlds without the clock system (tests); either path is hitch-clamped.
+            var decayDt = SystemAPI.TryGetSingleton<UIUnscaledTime>(out var uiTime)
+                ? uiTime.DeltaTime
+                : math.min(SystemAPI.Time.DeltaTime, UIClock.MaxStep);
 
             var statsLookup = SystemAPI.GetBufferLookup<Stat>(true);
             var intrinsicsLookup = SystemAPI.GetBufferLookup<Intrinsic>(true);

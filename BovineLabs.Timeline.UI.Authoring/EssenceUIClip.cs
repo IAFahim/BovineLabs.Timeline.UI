@@ -15,9 +15,9 @@ namespace BovineLabs.Timeline.UI.Authoring
     {
         public ConditionEventObject Event;
 
-        [Tooltip("How long the event toast stays on screen, in game-time seconds. Decays with scaled " +
-                 "delta time (clamped against frame hitches). See TODO.md item 13: a full " +
-                 "scaled-vs-unscaled clock policy is still owed, so under bullet-time this lingers longer.")]
+        [Tooltip("How long the event toast stays on screen, in seconds, UNSCALED wall-clock time: bullet-time " +
+                 "(WorldTimeScale) does not stretch it and game pause freezes it (UI clock, TODO.md item 13). " +
+                 "Clamped against frame hitches.")]
         public float DisplayDuration;
     }
 

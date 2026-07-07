@@ -61,6 +61,14 @@ namespace BovineLabs.Timeline.UI
         private IVisualElementScheduledItem m_HoldItem;
         private UnityEngine.UIElements.Experimental.ValueAnimation<float> m_Collapse;
 
+        // Pause freeze (clock policy, TODO.md item 13): the hold timer and collapse animation run on the UNSCALED
+        // VisualElement scheduler, so without this they keep draining while the game is paused. The driver toggles
+        // SetPaused from the bl-core PauseGame state; mid-flight collapse progress is captured so resume continues
+        // from where it froze instead of snapping.
+        private bool m_Paused;
+        private float m_CollapseProgress;
+        private int m_CollapseDurMs;
+
         public HudBar()
         {
             this.AddToClassList("vex-bar");
@@ -310,6 +318,11 @@ namespace BovineLabs.Timeline.UI
 
             this.m_HoldItem?.Pause();
             this.m_HoldItem = this.schedule.Execute(this.Collapse).StartingIn((long)this.m_HoldMs);
+            if (this.m_Paused)
+            {
+                this.m_HoldItem.Pause(); // accumulate while paused, but the hold timer stays frozen until resume
+            }
+
             this.ApplyChip();
         }
 
@@ -330,11 +343,19 @@ namespace BovineLabs.Timeline.UI
             this.m_Collapsing = true;
 
             var band = this.m_ChipHi - this.m_Value;
-            var dur = ComputeCollapseDurationMs(band, this.m_DrainMs, this.m_MinDrainMs, this.m_DrainRate);
+            this.m_CollapseDurMs = ComputeCollapseDurationMs(band, this.m_DrainMs, this.m_MinDrainMs, this.m_DrainRate);
+            this.m_CollapseProgress = 0f;
+            this.StartCollapseAnim(0f, this.m_CollapseDurMs);
+        }
+
+        // Starts (or resumes, from fromP) the fall animation over durMs. Height is captured at start time.
+        private void StartCollapseAnim(float fromP, int durMs)
+        {
             var h = this.track.resolvedStyle.height;
             h = h > 0f ? h : 20f;
-            this.m_Collapse = this.experimental.animation.Start(0f, 1f, dur, (_, p) =>
+            this.m_Collapse = this.experimental.animation.Start(fromP, 1f, durMs, (_, p) =>
             {
+                this.m_CollapseProgress = p;
                 this.chipClip.style.translate = new Translate(0f, h * p * 1.4f);
                 this.chipClip.style.opacity = this.m_Fade ? 1f - p : 1f;
             }).Ease(VexEase.Get(this.m_DrainEase));
@@ -348,6 +369,47 @@ namespace BovineLabs.Timeline.UI
                 this.ApplyChip();
             });
             this.m_Collapse.KeepAlive();
+        }
+
+        /// <summary>
+        /// Freeze / unfreeze the TIMED feedback (chip hold + collapse fall) for game pause — the scheduler and
+        /// experimental animations run on unscaled panel time, so without this a paused screenshot shows the trail
+        /// mid-drain. Told by the driver from the bl-core PauseGame state (clock policy, TODO.md item 13). SetState /
+        /// AddChip stay honored while paused: values apply, timers hold.
+        /// </summary>
+        public void SetPaused(bool paused)
+        {
+            if (this.m_Paused == paused)
+            {
+                return;
+            }
+
+            this.m_Paused = paused;
+            if (paused)
+            {
+                this.m_HoldItem?.Pause();
+                if (this.m_Collapsing && this.m_Collapse != null)
+                {
+                    // Stop (there is no pause on ValueAnimation) but keep m_Collapsing latched + progress captured,
+                    // so resume restarts the fall from the frozen frame over the remaining duration.
+                    this.m_Collapse.Stop();
+                    this.m_Collapse = null;
+                }
+            }
+            else
+            {
+                this.m_HoldItem?.Resume();
+                if (this.m_Collapsing && this.m_Collapse == null)
+                {
+                    this.StartCollapseAnim(this.m_CollapseProgress, RemainingCollapseMs(this.m_CollapseProgress, this.m_CollapseDurMs));
+                }
+            }
+        }
+
+        /// <summary>Remaining fall time after a pause froze the collapse at <paramref name="progress"/>. Pure for tests.</summary>
+        public static int RemainingCollapseMs(float progress, int durMs)
+        {
+            return (int)math.ceil((1f - math.saturate(progress)) * math.max(0, durMs));
         }
 
         /// <summary>
