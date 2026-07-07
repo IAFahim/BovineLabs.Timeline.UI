@@ -1,0 +1,28 @@
+/* Dialogue line skin. Bottom-centered speech box; all look lives here, structure in DialogText.uxml. */
+.vex-dialog {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: 6%;
+    padding: 14px 20px 16px 20px;
+    background-color: rgba(14, 16, 22, 0.88);
+    border-left-width: 3px;
+    border-left-color: rgb(120, 130, 145);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.vex-dialog__speaker {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(255, 205, 70);
+    margin-bottom: 4px;
+}
+
+.vex-dialog__line {
+    font-size: 16px;
+    color: rgb(235, 238, 244);
+    white-space: normal;
+}

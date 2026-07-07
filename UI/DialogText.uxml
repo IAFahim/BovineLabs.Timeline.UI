@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:appui="Unity.AppUI.UI" editor-extension-mode="False">
+    <Style src="DialogText.uss" />
+    <!-- Dialogue line panel. Player-facing text is LOCALIZED via App UI's LocalizedTextElement using the
+         `@table:entry` reference convention (LocalizationUtils.TryGetTableAndEntry): the "Dialog" string table
+         supplies the translation; with no localization installed the element degrades to the reference text so
+         nothing breaks. The body carries name="dialog-line" so a UITextRevealClip can target it for the typewriter
+         reveal. Authors: add the "Dialog" table with entries `speaker` and `line` (see the keys below). -->
+    <ui:VisualElement name="dialog" class="vex-dialog" picking-mode="Ignore">
+        <appui:LocalizedTextElement name="dialog-speaker" class="vex-dialog__speaker" text="@Dialog:speaker" picking-mode="Ignore" />
+        <appui:LocalizedTextElement name="dialog-line" class="vex-dialog__line" text="@Dialog:line" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>
