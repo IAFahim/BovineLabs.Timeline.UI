@@ -1,0 +1,49 @@
+/* Minimap skin. A fixed corner frame; the markers container is the projection surface the driver writes into. */
+.vex-minimap {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 180px;
+    height: 180px;
+    background-color: rgba(14, 16, 22, 0.72);
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: rgba(120, 130, 145, 0.6);
+    border-right-color: rgba(120, 130, 145, 0.6);
+    border-top-color: rgba(120, 130, 145, 0.6);
+    border-bottom-color: rgba(120, 130, 145, 0.6);
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    overflow: hidden;
+}
+
+/* Fills the frame; markers are absolutely positioned within by percent. */
+.vex-minimap__markers {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.vex-minimap__marker {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    margin-left: -5px; /* center on the projected point */
+    margin-top: -5px;
+    background-color: rgb(235, 238, 244);
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.vex-minimap__marker--p0 { background-color: rgb(74, 163, 255); }
+.vex-minimap__marker--p1 { background-color: rgb(70, 209, 122); }
+.vex-minimap__marker--p2 { background-color: rgb(255, 181, 84); }
+.vex-minimap__marker--p3 { background-color: rgb(255, 107, 158); }

@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="Minimap.uss" />
+    <!-- Minimap frame. MinimapDriverSystem projects each resolved player's world position through the camera resolved by
+         HudCameraProvider (shared camera today, per-player camera later) and places a marker per player inside
+         `minimap-markers`. Markers are created/removed dynamically for 1..N players — nothing here assumes a count. -->
+    <ui:VisualElement name="minimap" class="vex-minimap" picking-mode="Ignore">
+        <ui:VisualElement name="minimap-markers" class="vex-minimap__markers" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>
