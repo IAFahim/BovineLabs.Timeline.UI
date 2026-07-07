@@ -87,6 +87,8 @@ foreach (var fb in Query<DynamicBuffer<BarFeedbackEvent>>()) {
 
 ### TODO: Fix missing dependency completion in DataDisplayTrackSystem
 
+**STATUS: ✅ FIXED** — `state.EntityManager.CompleteDependencyBeforeRO<IdValue>()` is in `DataDisplayTrackSystem.OnUpdate`.
+
 **Priority:** Critical
 **Certainty:** Strongly Likely
 **Lens:** Timing / Event
@@ -100,6 +102,8 @@ foreach (var fb in Query<DynamicBuffer<BarFeedbackEvent>>()) {
 **Confidence:** High
 
 ### TODO: Ref-count overlapping reversible effects (USS class double-apply, text-reveal capture corruption)
+
+**STATUS: ✅ FIXED** — `ClassRefCounts` in `UssClassTrackSystem`; per-element base-text registry in `UITextRevealTrackSystem`.
 
 **Priority:** Critical
 **Certainty:** Confirmed
@@ -146,6 +150,8 @@ foreach (var fb in Query<DynamicBuffer<BarFeedbackEvent>>()) {
 
 ### TODO: HudBar — fix the m_Collapsing latch (frozen chip after detach) and batch ApplyStructure
 
+**STATUS: ✅ FIXED** — `DetachFromPanelEvent` teardown in `HudBar`; `SetState` batching; `SetTrailConfig` applied once at cache build (`ConfigApplied`).
+
 **Priority:** High
 **Certainty:** Confirmed (latch: Strongly Likely repro)
 **Lens:** State / Performance
@@ -166,6 +172,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 
 ### TODO: Views break permanently after the first panel detach (unsubscribe-without-resubscribe)
 
+**STATUS: ✅ FIXED** — both views pair `AttachToPanelEvent`/`DetachFromPanelEvent` with guarded resubscribe + itemsSource resync. (Also fixed since: both views now constructor-inject their DI ViewModel instead of newing a private copy.)
+
 **Priority:** High
 **Certainty:** Confirmed
 **Lens:** Event / State
@@ -178,6 +186,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 **Confidence:** High
 
 ### TODO: Remove ServerSimulation from presentation systems' WorldSystemFilter
+
+**STATUS: ✅ FIXED** — all 7 presentation systems now declare `Local|Client|Presentation` only; `ControllableRegistrySystem` audit complete (no server consumer) and `ServerSimulation` dropped there too.
 
 **Priority:** High
 **Certainty:** Confirmed
@@ -241,6 +251,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 
 ### TODO: Decide scaled vs unscaled time for UI feedback (event decay, chip drain, pause)
 
+**STATUS: ✅ FIXED** — policy = UNSCALED presentation time. `UIUnscaledClockSystem` publishes the `UIUnscaledTime` singleton (pause-aware via bl-core `PauseGame`, hitch-clamped); `EssenceUITrackSystem` toast decay and `DataUIDriverSystem` kernel dt both read it. `HudBar.SetPaused` freezes the scheduler-driven chip hold/collapse while paused (driver forwards `PauseGame`). Duration fields documented as unscaled seconds. Pure step math in `UIClock.Step` + `HudBar.RemainingCollapseMs`; tests: `UIClockTests`, `HudBarPauseTests`, `UIUnscaledClockSystemTests`.
+
 **Priority:** Medium
 **Certainty:** Confirmed (mechanics) / Risk (desired behavior)
 **Lens:** Timing
@@ -253,6 +265,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 
 ### TODO: ControllableRegistry hardening — duplicate PlayerId warning, dead Version, disposal aliasing
 
+**STATUS: ✅ MOSTLY FIXED** — (a) duplicate-seat warn-once (`ControllableSelection.IsDuplicateClaim` + latch), (b) `Version` bumped only on real change (`ControllableSelection.Changed`), bounds guard for a future `PlayerId` widening. Vacancy is handled: a seat with no live `Controllable` resolves to `Entity.Null`, hides its row, and resets slot state so a re-join snaps clean. **DEFERRED:** (c) `NativeArray`-in-component → `DynamicBuffer<ControllableEntry>` storage — a cross-package API change to a Phase-1 singleton with external consumers; carries Phase-1 regression risk, so left for a dedicated change rather than the 4P polish pass. Tests: `ControllableRegistryGuardTests`, `ControllableSelectionTests`.
+
 **Priority:** Medium
 **Certainty:** Confirmed
 **Lens:** Validation / Architecture
@@ -263,6 +277,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 **Confidence:** High
 
 ### TODO: Bake-time validation gaps (Id==0 schemas, null array entries, >255 rows, panel keys)
+
+**STATUS: ✅ FIXED** — `DataDisplayClip`/`EssenceUIClip` bake: `Id==0` `LogError` (context-pinged), null array entries warn with clip+index. `DataUISettings.Bake`: `>255` rows error, duplicate resolved-slot error, Binding-mode error, missing-Max warn, Event-kind-value warn, invalid `Format` error.
 
 **Priority:** Medium
 **Certainty:** Confirmed
@@ -323,8 +339,8 @@ this.RegisterCallback<DetachFromPanelEvent>(_ => {
 - **`EssenceUIView` hardcoded colors** (`TrackColor`, `FillColor`) — move to USS classes (`vex-essence__fill`) so themes/App UI tokens can restyle; per project standard, visuals live in USS (`Hud.uss` precedent).
 - **`NodeChip.clicked` event** — no way to remove the `Clickable` or dispose; fine for now, add `RemoveManipulator` on detach if pooling views.
 - **Localization** (`Risk`): `UIBindingEntry.Label`/`DataUISettings.Entry.Label` are raw strings shown to players. Project standard is `@TABLE:key` tokens via `LocalizedTextElement`. The driver writes `Label.text` directly — decide whether HUD labels are localizable; if yes, route through tokens (name-{i} becomes a LocalizedTextElement and the driver passes the token through).
-- **Docs**: no `Documentation~` for the package. The Hud.uxml comment block is the only contract doc for `card-{i}`. Write a one-page "HUD contract" (element names, classes, USS parts of HudBar, which knobs are live) once Critical #1 lands.
-- **`HudBar` first-layout flicker** (`Confirmed`, cosmetic): before the first `GeometryChangedEvent`, `m_TrackWidth == 0` → inner widths unset → textures collapse for a frame. Guard: skip rendering fills until width > 0 by keeping clips `display:none` when `w <= 0`.
+- **Docs**: ✅ DONE — `Documentation~/HudContract.md` documents element names, `.vex-bar__*` USS parts, live knobs, feedback/clock/seats.
+- **`HudBar` first-layout flicker** (`Confirmed`, cosmetic): ✅ DONE — `ApplyStructure` keeps `fill/ghost/chip/locked` clips `display:none` until the first `GeometryChangedEvent` resolves `m_TrackWidth > 0`, then re-shows.
 
 ## Designer Safety TODOs
 
@@ -503,19 +519,19 @@ public static IReadOnlyList<string> ValidateDataUI(DataUISettings s) {
 
 1. **[Critical]** Wire or delete dead bar config; adopt `HudBarMath` as the kernel (ghost/flash/visibility/drainRate/collapse trigger).
 2. **[Critical]** Non-destructive, bounded `BarFeedbackEvent` consumption (drain system, frame stamps, cap, multi-reader).
-3. **[Critical]** `DataDisplayTrackSystem`: `CompleteDependencyBeforeRO<IdValue>()`.
-4. **[Critical]** Overlap safety in reversible effects: USS class ref-count + text-reveal base-text registry.
+3. **[Critical]** ✅ DONE — `DataDisplayTrackSystem`: `CompleteDependencyBeforeRO<IdValue>()`.
+4. **[Critical]** ✅ DONE — Overlap safety in reversible effects: USS class ref-count + text-reveal base-text registry.
 5. **[High]** Driver zero-alloc: panel/slot element cache, precomputed names, change-only writes.
 6. **[High]** Explicit slot names + duplicate/overflow bake errors (kill index-reorder trap).
 7. **[High]** Text reveal: rich-text-safe + grapheme-cluster reveal; per-frame Substring early-out.
-8. **[High]** HudBar: detach-safe collapse latch, `SetState` batching, config-apply-once.
-9. **[High]** Views resubscribe on attach; verify GridView refresh cadence.
-10. **[High]** Remove `ServerSimulation` from presentation systems.
+8. **[High]** ✅ DONE — HudBar: detach-safe collapse latch, `SetState` batching, config-apply-once.
+9. **[High]** ✅ DONE — Views resubscribe on attach; verify GridView refresh cadence.
+10. **[High]** ✅ DONE — Remove `ServerSimulation` from presentation systems (incl. `ControllableRegistrySystem`).
 11. **[High]** Narrow sync points to targeted `CompleteDependencyBefore*`.
 12. **[High]** Handle or loudly reject unhandled `FeedbackKind`s.
-13. **[Medium]** Clock policy: unscaled UI decay, pause behavior for HudBar animations.
-14. **[Medium]** Registry hardening: duplicate PlayerId warn, buffer-based storage, meaningful Version.
-15. **[Medium]** Bake validation: Id==0, null entries, link/route mismatch; UXML-key editor check.
+13. **[Medium]** ✅ DONE — Clock policy: unscaled UI decay (`UIUnscaledClockSystem`/`UIUnscaledTime`), pause freeze for HudBar animations (`SetPaused`).
+14. **[Medium]** ✅ MOSTLY DONE — Registry hardening: duplicate PlayerId warn ✓, meaningful Version ✓, vacancy reset ✓; buffer-based storage DEFERRED (cross-package API change, Phase-1 risk).
+15. **[Medium]** ✅ DONE — Bake validation: Id==0, null entries, >255 rows, duplicate slots, Binding/Format errors. (UXML-key editor menu still owed — item 19.)
 16. **[Medium]** Centralize defaults/epsilons (`BarFeedbackDefaults`).
 17. **[Medium]** ViewModel scratch lifetime on teardown; failure messages name the actual cause (UxmlKey, TargetId).
 18. **[Medium]** `ActiveUIEvent` source identity; stale-clear scope; PlayerId (not Entity.Index) in rows.
