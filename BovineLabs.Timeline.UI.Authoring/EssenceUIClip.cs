@@ -5,6 +5,7 @@ using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Timeline.Authoring;
 using BovineLabs.Timeline.UI.Data;
 using Unity.Entities;
+using UnityEngine;
 using UnityEngine.Timeline;
 
 namespace BovineLabs.Timeline.UI.Authoring
@@ -13,6 +14,10 @@ namespace BovineLabs.Timeline.UI.Authoring
     public struct EventUIConfig
     {
         public ConditionEventObject Event;
+
+        [Tooltip("How long the event toast stays on screen, in game-time seconds. Decays with scaled " +
+                 "delta time (clamped against frame hitches). See TODO.md item 13: a full " +
+                 "scaled-vs-unscaled clock policy is still owed, so under bullet-time this lingers longer.")]
         public float DisplayDuration;
     }
 
@@ -44,7 +49,10 @@ namespace BovineLabs.Timeline.UI.Authoring
 
         private void RegisterDependencies(BakingContext context)
         {
-            context.Baker.DependsOn(Source.link);
+            // Guard for clarity: Source.link is an optional schema reference (null when the source
+            // routes via Player/Self rather than an Essence link).
+            if (Source.link != null)
+                context.Baker.DependsOn(Source.link);
             if (Stats != null)
                 foreach (var s in Stats)
                     context.Baker.DependsOn(s);
@@ -62,9 +70,17 @@ namespace BovineLabs.Timeline.UI.Authoring
             if (Stats == null)
                 return;
 
-            foreach (var s in Stats)
-                if (s != null)
-                    statBuffer.Add(new ClipStat { Key = s.Key.ID, Name = s.name });
+            for (var i = 0; i < Stats.Length; i++)
+            {
+                var s = Stats[i];
+                if (s == null)
+                {
+                    Debug.LogWarning($"{nameof(EssenceUIClip)} '{name}': Stats[{i}] is null and will be skipped.", this);
+                    continue;
+                }
+
+                statBuffer.Add(new ClipStat { Key = s.Key.ID, Name = s.name });
+            }
         }
 
         private void BakeIntrinsics(Entity clipEntity, BakingContext context)
@@ -73,14 +89,23 @@ namespace BovineLabs.Timeline.UI.Authoring
             if (Intrinsics == null)
                 return;
 
-            foreach (var i in Intrinsics)
-                if (i != null)
-                    intBuffer.Add(new ClipIntrinsic
-                    {
-                        Key = i.Key.ID, Name = i.name,
-                        Min = i.Range.x, Max = i.Range.y,
-                        MinStat = i.MinStat, MaxStat = i.MaxStat
-                    });
+            for (var idx = 0; idx < Intrinsics.Length; idx++)
+            {
+                var i = Intrinsics[idx];
+                if (i == null)
+                {
+                    Debug.LogWarning(
+                        $"{nameof(EssenceUIClip)} '{name}': Intrinsics[{idx}] is null and will be skipped.", this);
+                    continue;
+                }
+
+                intBuffer.Add(new ClipIntrinsic
+                {
+                    Key = i.Key.ID, Name = i.name,
+                    Min = i.Range.x, Max = i.Range.y,
+                    MinStat = i.MinStat, MaxStat = i.MaxStat
+                });
+            }
         }
 
         private void BakeEvents(Entity clipEntity, BakingContext context)
@@ -89,10 +114,19 @@ namespace BovineLabs.Timeline.UI.Authoring
             if (Events == null)
                 return;
 
-            foreach (var e in Events)
-                if (e.Event != null)
-                    evBuffer.Add(new ClipEvent
-                        { Key = new ConditionKey(e.Event.Key), Name = e.Event.name, Duration = e.DisplayDuration });
+            for (var i = 0; i < Events.Length; i++)
+            {
+                var e = Events[i];
+                if (e.Event == null)
+                {
+                    Debug.LogWarning(
+                        $"{nameof(EssenceUIClip)} '{name}': Events[{i}].Event is null and will be skipped.", this);
+                    continue;
+                }
+
+                evBuffer.Add(new ClipEvent
+                    { Key = new ConditionKey(e.Event.Key), Name = e.Event.name, Duration = e.DisplayDuration });
+            }
         }
     }
 }

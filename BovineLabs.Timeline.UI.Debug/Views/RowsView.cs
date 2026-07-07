@@ -27,13 +27,28 @@ namespace BovineLabs.Timeline.UI.Debug.Views
             };
 
             Add(grid);
-            ViewModel.PropertyChanged += OnPropertyChanged;
+
+            // Subscribe on attach, unsubscribe on detach (registered pair — no constructor subscription).
+            // Without the attach counterpart a single detach/re-attach left the grid unsubscribed forever,
+            // silently showing stale rows. On attach we resync itemsSource + Refresh so it is current.
+            RegisterCallback<AttachToPanelEvent>(_ => OnAttach());
             RegisterCallback<DetachFromPanelEvent>(_ => ViewModel.PropertyChanged -= OnPropertyChanged);
         }
 
         public void Dispose()
         {
+            // Final safety unsubscribe for callers that dispose without a detach event firing.
             ViewModel.PropertyChanged -= OnPropertyChanged;
+        }
+
+        private void OnAttach()
+        {
+            // Guard against double-subscribe if attach fires without an intervening detach.
+            ViewModel.PropertyChanged -= OnPropertyChanged;
+            ViewModel.PropertyChanged += OnPropertyChanged;
+
+            grid.itemsSource = ViewModel.Rows;
+            grid.Refresh();
         }
 
         private VisualElement MakeRow()

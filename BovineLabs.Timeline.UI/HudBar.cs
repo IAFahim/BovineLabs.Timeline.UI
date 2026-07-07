@@ -7,13 +7,15 @@ using UnityEngine.UIElements;
 namespace BovineLabs.Timeline.UI
 {
     /// <summary>
-    /// A DUMB, data-bindable bar PRIMITIVE — zero logic, infers nothing. It renders three STRUCTURE values it is told:
+    /// A DUMB, data-bindable bar PRIMITIVE — zero logic, infers nothing. It renders the STRUCTURE values it is told:
     /// <list type="bullet">
     /// <item><see cref="value"/> — current/max fill.</item>
     /// <item><see cref="ghost"/> — the GHOST SLIDER (delayed damage / heal-lead). The band between fill and ghost is
     /// drawn as a CROPPED slice of the blade (full-size, windowed — never squashed), colored by which side the ghost is
     /// on (lost = warm, gained = green). The game drives the ghost value's lag; the bar only renders it.</item>
     /// <item><see cref="locked"/> — a hatched locked band (curse) at the high end; a drop under it is never damage.</item>
+    /// <item>flash — a full-bleed overlay pulse (damage/heal feedback). Its visual comes from the project's
+    /// <c>.vex-bar__flash</c> USS class; the bar only maps a 0..1 amount to opacity, capped by <c>--vex-flash-max</c>.</item>
     /// </list>
     /// All look is USS; this only maps numbers to geometry.
     /// </summary>
@@ -21,6 +23,7 @@ namespace BovineLabs.Timeline.UI
     public partial class HudBar : VisualElement
     {
         private static readonly CustomStyleProperty<Color> LowTintProp = new("--vex-low-tint");
+        private static readonly CustomStyleProperty<float> FlashMaxProp = new("--vex-flash-max");
 
         private readonly VisualElement track;
         private readonly VisualElement fillClip;
@@ -31,10 +34,13 @@ namespace BovineLabs.Timeline.UI
         private readonly VisualElement lockedInner;
         private readonly VisualElement chipClip;
         private readonly VisualElement chipInner;
+        private readonly VisualElement flashOverlay;
 
         private float m_Value;
         private float m_Ghost;
         private float m_Locked;
+        private float m_Flash;
+        private float m_FlashMax = 0.45f;
         private float m_LowThreshold = 0.5f;
         private float m_TrackWidth;
         private Color m_LowColor = new Color(1f, 0.35f, 0.27f, 1f);
@@ -49,6 +55,7 @@ namespace BovineLabs.Timeline.UI
         private float m_HoldMs = 400f;
         private float m_DrainMs = 500f;
         private float m_MinDrainMs = 120f;
+        private float m_DrainRate = 1.5f;
         private float m_MinChipFrac = 0.005f;
         private EaseId m_DrainEase = EaseId.OutCubic;
         private IVisualElementScheduledItem m_HoldItem;
@@ -90,6 +97,11 @@ namespace BovineLabs.Timeline.UI
 
             this.track.Add(Fill("vex-bar__frame"));
 
+            // flash overlay — added AFTER the frame so it draws on top; full-bleed. The visual (color/image) is the
+            // project's .vex-bar__flash USS; the bar only drives its opacity from the told flash amount.
+            this.flashOverlay = Fill("vex-bar__flash");
+            this.track.Add(this.flashOverlay);
+
             this.RegisterCallback<GeometryChangedEvent>(_ =>
             {
                 this.m_TrackWidth = this.track.resolvedStyle.width;
@@ -97,12 +109,41 @@ namespace BovineLabs.Timeline.UI
             });
             this.RegisterCallback<CustomStyleResolvedEvent>(e =>
             {
+                var changed = false;
                 if (e.customStyle.TryGetValue(LowTintProp, out var c))
                 {
                     this.m_LowColor = c;
+                    changed = true;
+                }
+
+                if (e.customStyle.TryGetValue(FlashMaxProp, out var f))
+                {
+                    this.m_FlashMax = f;
+                    changed = true;
+                }
+
+                if (changed)
+                {
                     this.ApplyStructure();
                 }
             });
+
+            // Detach-safe collapse latch: a panel unmount / clip end / scene reload kills the panel-scheduled collapse
+            // animation WITHOUT firing OnCompleted, so m_Collapsing would stay latched true forever and ApplyChip would
+            // early-return forever (frozen chip on re-attach). Tear the trail state down here so re-attach starts clean.
+            this.RegisterCallback<DetachFromPanelEvent>(_ =>
+            {
+                this.m_Collapse?.Stop();
+                this.m_Collapse = null;
+                this.m_Collapsing = false;
+                this.m_HoldItem?.Pause();
+                this.m_HoldItem = null;
+                this.m_ChipHi = this.m_Value;
+                this.chipClip.style.translate = new Translate(0f, 0f);
+                this.chipClip.style.opacity = 1f;
+            });
+            this.RegisterCallback<AttachToPanelEvent>(_ => this.ApplyStructure());
+
             this.ApplyStructure();
         }
 
@@ -131,6 +172,14 @@ namespace BovineLabs.Timeline.UI
         }
 
         [UxmlAttribute]
+        [CreateProperty]
+        public float flash
+        {
+            get => this.m_Flash;
+            set { this.m_Flash = value; this.ApplyStructure(); }
+        }
+
+        [UxmlAttribute]
         public float lowThreshold
         {
             get => this.m_LowThreshold;
@@ -144,36 +193,79 @@ namespace BovineLabs.Timeline.UI
             set { this.m_RightToLeft = value; this.ApplyStructure(); }
         }
 
+        /// <summary>
+        /// Set fill / ghost / locked / flash in ONE shot and apply the layout ONCE. The driver calls this instead of the
+        /// four property setters, which would each trigger a full <see cref="ApplyStructure"/> pass (4× the style churn
+        /// per bar per frame). The properties remain for UXML authoring and data bindings.
+        /// </summary>
+        public void SetState(float fill, float ghost, float locked, float flash)
+        {
+            this.m_Value = fill;
+            this.m_Ghost = ghost;
+            this.m_Locked = locked;
+            this.m_Flash = flash;
+            this.ApplyStructure();
+        }
+
         private void ApplyStructure()
         {
             var w = this.m_TrackWidth;
+            var laidOut = w > 0f;
             var fill = Saturate(this.m_Value);
             var ghost = Saturate(this.m_Ghost);
 
-            // fill (reveal, never squash): full-width inner inside a %-clip pinned to the origin side.
-            AnchorClip(this.fillClip, this.fillInner, 0f, fill, w, this.m_RightToLeft);
-
-            // ghost slider: the band between fill and ghost, cropped from the blade. healing = ghost sits below fill.
-            // Shown only when the trail mode includes the slider (chip is the separate accumulating band below).
-            var lo = math.min(fill, ghost);
-            var hi = math.max(fill, ghost);
-            var healing = ghost < fill - 0.001f;
-            var showGhost = (this.m_TrailMode == TrailMode.GhostSlider || this.m_TrailMode == TrailMode.Both) && (hi - lo) > 0.003f;
-            this.ghostClip.style.display = showGhost ? DisplayStyle.Flex : DisplayStyle.None;
-            if (showGhost)
+            if (!laidOut)
             {
-                AnchorClip(this.ghostClip, this.ghostInner, lo, hi, w, this.m_RightToLeft);
-                this.EnableInClassList("vex-bar--healing", healing);
+                // First-layout flicker guard: before the first GeometryChangedEvent the track has no resolved width, so
+                // the windowed inners would collapse to zero for a frame. Keep every clip hidden until width is known;
+                // they re-show on the first GeometryChangedEvent which re-runs this pass with w > 0.
+                this.fillClip.style.display = DisplayStyle.None;
+                this.ghostClip.style.display = DisplayStyle.None;
+                this.chipClip.style.display = DisplayStyle.None;
+                this.lockedClip.style.display = DisplayStyle.None;
+            }
+            else
+            {
+                // fill (reveal, never squash): full-width inner inside a %-clip pinned to the origin side.
+                this.fillClip.style.display = DisplayStyle.Flex;
+                AnchorClip(this.fillClip, this.fillInner, 0f, fill, w, this.m_RightToLeft);
+
+                // ghost slider: the band between fill and ghost, cropped from the blade. healing = ghost sits below fill.
+                // Shown only when the trail mode includes the slider (chip is the separate accumulating band below).
+                var lo = math.min(fill, ghost);
+                var hi = math.max(fill, ghost);
+                var healing = ghost < fill - 0.001f;
+                var showGhost = (this.m_TrailMode == TrailMode.GhostSlider || this.m_TrailMode == TrailMode.Both) && (hi - lo) > 0.003f;
+                this.ghostClip.style.display = showGhost ? DisplayStyle.Flex : DisplayStyle.None;
+                if (showGhost)
+                {
+                    AnchorClip(this.ghostClip, this.ghostInner, lo, hi, w, this.m_RightToLeft);
+                    this.EnableInClassList("vex-bar--healing", healing);
+                }
+
+                this.ApplyChip(); // the chip window [fill, chipHi] tracks the moving fill
+
+                // locked band (curse): the cropped blade tip [1-lk,1] at the HIGH end. Structure, never damage.
+                var lk = Saturate(this.m_Locked);
+                this.lockedClip.style.display = lk > 0f ? DisplayStyle.Flex : DisplayStyle.None;
+                if (lk > 0f)
+                {
+                    AnchorClip(this.lockedClip, this.lockedInner, 1f - lk, 1f, w, this.m_RightToLeft);
+                }
             }
 
-            this.ApplyChip(); // the chip window [fill, chipHi] tracks the moving fill
-
-            // locked band (curse): the cropped blade tip [1-lk,1] at the HIGH end. Structure, never damage.
-            var lk = Saturate(this.m_Locked);
-            this.lockedClip.style.display = lk > 0f ? DisplayStyle.Flex : DisplayStyle.None;
-            if (lk > 0f)
+            // flash overlay: full-bleed pulse independent of track width. Opacity is the told amount scaled by the
+            // USS-driven cap (--vex-flash-max, default 0.45). Hidden entirely when negligible so it never eats picking
+            // (it already ignores picking) or draws a 0-opacity layer.
+            var flashAmt = Saturate(this.m_Flash);
+            if (flashAmt > 0.001f)
             {
-                AnchorClip(this.lockedClip, this.lockedInner, 1f - lk, 1f, w, this.m_RightToLeft);
+                this.flashOverlay.style.display = DisplayStyle.Flex;
+                this.flashOverlay.style.opacity = flashAmt * this.m_FlashMax;
+            }
+            else
+            {
+                this.flashOverlay.style.display = DisplayStyle.None;
             }
 
             // continuous low-health recolor (works on tinted blades; on a pure-red blade it reads via fill amount).
@@ -184,16 +276,17 @@ namespace BovineLabs.Timeline.UI
         }
 
         /// <summary>Driver sets the trail behaviour from the baked profile. Called before AddChip.</summary>
-        public void SetTrailConfig(TrailMode mode, bool accumulate, float holdMs, float drainMs, float minDrainMs, EaseId ease, bool fade, float minChipFrac)
+        public void SetTrailConfig(TrailMode mode, bool accumulate, float holdMs, float drainMs, float minDrainMs, EaseId ease, bool fade, float minChipFrac, float drainRate)
         {
             this.m_TrailMode = mode;
             this.m_Accumulate = accumulate;
             this.m_HoldMs = math.max(0f, holdMs);
-            this.m_DrainMs = math.max(0f, drainMs);
+            this.m_DrainMs = math.max(0f, drainMs); // keep 0 so drainRate can take over in ComputeCollapseDurationMs.
             this.m_MinDrainMs = math.max(1f, minDrainMs);
             this.m_DrainEase = ease;
             this.m_Fade = fade;
             this.m_MinChipFrac = math.max(0f, minChipFrac);
+            this.m_DrainRate = math.max(0f, drainRate);
         }
 
         /// <summary>TOLD a damage chip of <paramref name="amountFrac"/> (fraction of max). Accumulates the held band
@@ -236,7 +329,8 @@ namespace BovineLabs.Timeline.UI
             this.chipClip.style.display = DisplayStyle.Flex;
             this.m_Collapsing = true;
 
-            var dur = (int)math.max(this.m_MinDrainMs, this.m_DrainMs);
+            var band = this.m_ChipHi - this.m_Value;
+            var dur = ComputeCollapseDurationMs(band, this.m_DrainMs, this.m_MinDrainMs, this.m_DrainRate);
             var h = this.track.resolvedStyle.height;
             h = h > 0f ? h : 20f;
             this.m_Collapse = this.experimental.animation.Start(0f, 1f, dur, (_, p) =>
@@ -254,6 +348,27 @@ namespace BovineLabs.Timeline.UI
                 this.ApplyChip();
             });
             this.m_Collapse.KeepAlive();
+        }
+
+        /// <summary>
+        /// Eased-collapse duration in ms. Honors the <see cref="BarFeedbackProfile"/> tooltip "0 = use drainRate": when
+        /// <paramref name="drainMs"/> is 0 and a positive <paramref name="drainRate"/> (units/sec) is set, the duration
+        /// is <c>band / rate</c> seconds, clamped to [minDrainMs, 5000ms]; otherwise it is <c>max(minDrainMs, drainMs)</c>.
+        /// Pure so it can be unit-tested without a panel.
+        /// </summary>
+        public static int ComputeCollapseDurationMs(float band, float drainMs, float minDrainMs, float drainRate)
+        {
+            float dur;
+            if (drainMs <= 0f && drainRate > 0f)
+            {
+                dur = math.clamp((math.max(0f, band) / drainRate) * 1000f, minDrainMs, 5000f);
+            }
+            else
+            {
+                dur = math.max(minDrainMs, drainMs);
+            }
+
+            return (int)dur;
         }
 
         private void ApplyChip()

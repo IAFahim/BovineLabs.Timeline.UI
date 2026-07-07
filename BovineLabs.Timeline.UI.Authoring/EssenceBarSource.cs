@@ -31,15 +31,19 @@ namespace BovineLabs.Timeline.UI.Authoring
         public IntrinsicSchemaObject ghostIntrinsic;
         [Tooltip("For GhostMode.FromStat.")]
         public StatSchemaObject ghostStat;
-        public float ghostDelay = 0.4f;
-        public float ghostSpeed = 6f;
+        public float ghostDelay = BarFeedbackDefaults.GhostDelay;
+        public float ghostSpeed = BarFeedbackDefaults.GhostSpeed;
 
         [Header("Flash")]
-        public float flashDecay = 0.25f;
+        public float flashDecay = BarFeedbackDefaults.FlashDecay;
 
         [Header("Trail behaviour (optional)")]
-        [Tooltip("Shared feedback profile — drop-chip/slider toggle, accumulate, hold, collapse ease/rate, fade. " +
-                 "None = sensible defaults. The SAME asset drives both the world bar and the HUD.")]
+        [Tooltip("Shared feedback profile — drop-chip/slider toggle, accumulate, hold, drain ease/rate, fade. " +
+                 "None = BarFeedbackDefaults. The SAME asset drives both the world bar and the HUD.")]
         public BarFeedbackProfile feedback;
+
+        /// <summary>True when a Max stat is assigned. Lets editor-time validators in another assembly check the
+        /// denominator without needing a direct reference to the Essence schema type.</summary>
+        public bool HasMax => this.max != null;
     }
 }

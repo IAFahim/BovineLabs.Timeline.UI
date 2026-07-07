@@ -1,8 +1,15 @@
 namespace BovineLabs.Timeline.UI.Authoring
 {
-    using BovineLabs.Reaction.Authoring.Conditions;
     using BovineLabs.Timeline.UI.Data;
     using UnityEngine;
+
+    // CHANGELOG (production audit — "wire or delete dead bar config"):
+    //   REMOVED collapseTrigger, collapseEvent, maxHoldMs, healEase, healDrainMs — these were never baked into
+    //   UIBindingEntry nor read by any runtime system (dead knobs that silently did nothing). Rather than ship a
+    //   half-wired collapse-signal/heal-drain feature, the fields (and the CollapseTrigger enum) were dropped.
+    //   The remaining fields ARE wired: trailMode/accumulate/holdMs/drainMs/drainRate/drainEase/minDrainMs/fade/
+    //   fadeMs/minChipFrac all bake into UIBindingEntry and reach HudBar via SetTrailConfig. Defaults now come from
+    //   BarFeedbackDefaults so an empty profile and "no profile" behave identically.
 
     /// <summary>
     /// BEHAVIOR SOUL (shared world + screen, zero colors). Drives the ACCUMULATE → HOLD → COLLAPSE(eased) + SWISH trail.
@@ -16,36 +23,27 @@ namespace BovineLabs.Timeline.UI.Authoring
         [Header("Trail")]
         public TrailMode trailMode = TrailMode.GhostSlider;
         [Tooltip("Repeated hits raise the held band (high-water mark) instead of replacing it.")]
-        public bool accumulate = true;
+        public bool accumulate = BarFeedbackDefaults.Accumulate;
         [Tooltip("Each hit re-arms the hold timer, so a burst keeps the window open.")]
         public bool reArmOnHit = true;
         [Tooltip("Ignore sub-fraction chips so a 1-damage tick doesn't flicker.")]
-        [Range(0f, 0.1f)] public float minChipFrac = 0.005f;
+        [Range(0f, 0.1f)] public float minChipFrac = BarFeedbackDefaults.MinChipFrac;
 
-        [Header("Collapse")]
-        public CollapseTrigger collapseTrigger = CollapseTrigger.Timeout;
-        [Tooltip("Hold this long (no new hit) before draining, when trigger includes Timeout.")]
-        public float holdMs = 350f;
-        [Tooltip("Explicit 'collapse now' event (for Signaled/Both).")]
-        public ConditionEventObject collapseEvent;
-        [Tooltip("Safety cap: drain after this long even if a Signaled event never fires.")]
-        public float maxHoldMs = 4000f;
+        [Header("Hold")]
+        [Tooltip("Hold this long (no new hit) before draining.")]
+        public float holdMs = BarFeedbackDefaults.HoldMs;
 
         [Header("Drain (the swish)")]
         [Tooltip("Eased drain duration. 0 = use drainRate instead.")]
-        public float drainMs = 450f;
+        public float drainMs = BarFeedbackDefaults.DrainMs;
         [Tooltip("Units/sec drain when drainMs == 0 (duration = band / rate).")]
-        public float drainRate = 1.5f;
-        public EaseId drainEase = EaseId.OutCubic;
+        public float drainRate = BarFeedbackDefaults.DrainRate;
+        public EaseId drainEase = BarFeedbackDefaults.DrainEase;
         [Tooltip("Floor so even a tiny drain is readable.")]
-        public float minDrainMs = 120f;
+        public float minDrainMs = BarFeedbackDefaults.MinDrainMs;
 
         [Header("Fade")]
-        public bool fade = true;
-        public float fadeMs = 200f;
-
-        [Header("Heal lead (ghost below fill)")]
-        public EaseId healEase = EaseId.OutQuad;
-        public float healDrainMs = 350f;
+        public bool fade = BarFeedbackDefaults.Fade;
+        public float fadeMs = BarFeedbackDefaults.FadeMs;
     }
 }

@@ -30,13 +30,32 @@ namespace BovineLabs.Timeline.UI
             Add(Section("Stats", stats));
             Add(Section("Events", events));
 
-            ViewModel.PropertyChanged += OnPropertyChanged;
+            // Subscribe on attach, unsubscribe on detach (registered pair — no constructor subscription).
+            // Without the attach counterpart a single detach/re-attach (tab switch, panel rebuild, a
+            // UxmlViewTrack remount of a parent) left the view unsubscribed forever, silently showing
+            // stale data. On attach we also resync itemsSource + Refresh so a re-attached view is current.
+            RegisterCallback<AttachToPanelEvent>(_ => OnAttach());
             RegisterCallback<DetachFromPanelEvent>(_ => ViewModel.PropertyChanged -= OnPropertyChanged);
         }
 
         public void Dispose()
         {
+            // Final safety unsubscribe for callers that dispose without a detach event firing.
             ViewModel.PropertyChanged -= OnPropertyChanged;
+        }
+
+        private void OnAttach()
+        {
+            // Guard against double-subscribe if attach fires without an intervening detach.
+            ViewModel.PropertyChanged -= OnPropertyChanged;
+            ViewModel.PropertyChanged += OnPropertyChanged;
+
+            intrinsics.itemsSource = ViewModel.Intrinsics;
+            intrinsics.Refresh();
+            stats.itemsSource = ViewModel.Stats;
+            stats.Refresh();
+            events.itemsSource = ViewModel.Events;
+            events.Refresh();
         }
 
         private GridView Build(Func<VisualElement> make, Action<VisualElement, int> bind, IList source)

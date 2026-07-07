@@ -40,6 +40,10 @@ namespace BovineLabs.Timeline.UI.Data
     {
         public byte Slot; // == settings list index → the Rows[Slot] the UXML binds
 
+        // Optional explicit slot name. When set the driver resolves elements as card-{SlotName}/bar-{SlotName}/… instead
+        // of card-{Slot}, so reordering rows no longer silently rewires cards. Empty = fall back to the numeric Slot.
+        public FixedString64Bytes SlotName;
+
         public UISource Source;
 
         public UIValueKind ValueKind;
@@ -67,7 +71,7 @@ namespace BovineLabs.Timeline.UI.Data
         public byte ShowOnHealthChange;
         public byte FlashOnDamage;
 
-        // Trail behaviour (baked from BarFeedbackProfile; defaults when none) → HudBar.SetTrailConfig.
+        // Trail behaviour (baked from BarFeedbackProfile; BarFeedbackDefaults when none) → HudBar.SetTrailConfig.
         public byte TrailMode;
         public byte Accumulate;
         public byte Fade;
@@ -75,6 +79,8 @@ namespace BovineLabs.Timeline.UI.Data
         public float HoldMs;
         public float DrainMs;
         public float MinDrainMs;
+        public float DrainRate;   // units/sec drain when DrainMs == 0 → HudBar.SetTrailConfig(..., drainRate)
+        public float FadeMs;      // fade duration (ms); baked from the profile (HudBar fade toggle is Fade above)
         public float MinChipFrac;
     }
 }

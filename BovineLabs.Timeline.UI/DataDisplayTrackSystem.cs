@@ -12,7 +12,6 @@ namespace BovineLabs.Timeline.UI
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
-        WorldSystemFilterFlags.ServerSimulation |
         WorldSystemFilterFlags.Presentation)]
     public partial struct DataDisplayTrackSystem : ISystem, ISystemStartStop
     {
@@ -45,6 +44,12 @@ namespace BovineLabs.Timeline.UI
         public void OnUpdate(ref SystemState state)
         {
             scratch.Clear();
+
+            // We read the IdValue buffer lookup on the main thread below. SystemAPI.Query only
+            // auto-completes the queried types (ClipDataId, TrackBinding) — not IdValue — so a
+            // producer that writes IdValue from a scheduled job would race (or trip the safety
+            // system) without this targeted completion. Narrow-complete RO to avoid a full sync.
+            state.EntityManager.CompleteDependencyBeforeRO<IdValue>();
             var values = SystemAPI.GetBufferLookup<IdValue>(true);
             var visible = false;
 

@@ -9,11 +9,13 @@ using BovineLabs.Timeline.Core;
 using BovineLabs.Timeline.Data;
 using BovineLabs.Timeline.EntityLinks.Data;
 using BovineLabs.Timeline.Essence;
+using BovineLabs.Timeline.PlayerInputs.Data;
 using BovineLabs.Timeline.UI.Data;
 using BovineLabs.Timeline.UI.Data.ViewModel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace BovineLabs.Timeline.UI
 {
@@ -24,7 +26,6 @@ namespace BovineLabs.Timeline.UI
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
-        WorldSystemFilterFlags.ServerSimulation |
         WorldSystemFilterFlags.Presentation)]
     public partial struct EssenceUITrackSystem : ISystem, ISystemStartStop
     {
@@ -34,6 +35,7 @@ namespace BovineLabs.Timeline.UI
         private NativeList<EssenceUIViewModel.Data.EventRow> eventScratch;
         private UnsafeComponentLookup<Targets> targetsLookup;
         private UnsafeComponentLookup<EntityLinkSource> sourcesLookup;
+        private UnsafeComponentLookup<PlayerId> playerIdLookup;
         private UnsafeBufferLookup<EntityLinkEntry> linksLookup;
 
         public void OnCreate(ref SystemState state)
@@ -47,6 +49,7 @@ namespace BovineLabs.Timeline.UI
 
             targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
             sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
+            playerIdLookup = state.GetUnsafeComponentLookup<PlayerId>(true);
             linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
 
             state.RequireForUpdate<ControllableRegistry>();
@@ -76,19 +79,45 @@ namespace BovineLabs.Timeline.UI
             intrinsicScratch.Clear();
             eventScratch.Clear();
 
-            var dt = SystemAPI.Time.DeltaTime;
+            // TODO.md item 13: HUD feedback decays on game time. Clamp the step so a frame hitch
+            // (or a resumed-from-pause spike) can't expire a multi-second toast in a single frame.
+            // Full scaled-vs-unscaled clock policy is still owed — see ActiveUIEvent.TimeRemaining.
+            var decayDt = math.min(SystemAPI.Time.DeltaTime, 0.1f);
+
             var statsLookup = SystemAPI.GetBufferLookup<Stat>(true);
             var intrinsicsLookup = SystemAPI.GetBufferLookup<Intrinsic>(true);
             var eventsLookup = SystemAPI.GetBufferLookup<ConditionEvent>(true);
 
             targetsLookup.Update(ref state);
             sourcesLookup.Update(ref state);
+            playerIdLookup.Update(ref state);
             linksLookup.Update(ref state);
             var players = SystemAPI.GetSingleton<ControllableRegistry>();
 
-            state.Dependency.Complete();
+            // Main-thread UI reads below need these buffers/components settled. Narrow-complete each
+            // read type instead of a blanket state.Dependency.Complete() so unrelated worker jobs keep
+            // running (TODO.md item 11). Every lookup read further down MUST appear in this list:
+            //   Stat / Intrinsic / ConditionEvent   -> per-player Essence values (statsLookup/intrinsicsLookup/eventsLookup)
+            //   Targets / EntityLinkSource / EntityLinkEntry -> UISourceResolver.TryResolve (targets/sources/links)
+            //   PlayerId                              -> row "Player" display value (playerIdLookup)
+            state.EntityManager.CompleteDependencyBeforeRO<Stat>();
+            state.EntityManager.CompleteDependencyBeforeRO<Intrinsic>();
+            state.EntityManager.CompleteDependencyBeforeRO<ConditionEvent>();
+            state.EntityManager.CompleteDependencyBeforeRO<Targets>();
+            state.EntityManager.CompleteDependencyBeforeRO<EntityLinkSource>();
+            state.EntityManager.CompleteDependencyBeforeRO<EntityLinkEntry>();
+            state.EntityManager.CompleteDependencyBeforeRO<PlayerId>();
 
+            // Stale-clear: a clip that is no longer showing must drop its accumulated toasts so a
+            // re-activation starts clean. A clip stops showing when EITHER ClipActive OR TimelineActive
+            // is disabled (e.g. director destroyed the same frame without disabling ClipActive), so we
+            // sweep both. The Length>0 guard makes the second pass a no-op on a buffer the first already
+            // cleared, so a doubly-disabled clip is never cleared twice (TODO.md item 18).
             foreach (var staleEvents in SystemAPI.Query<DynamicBuffer<ActiveUIEvent>>().WithDisabled<ClipActive>())
+                if (staleEvents.Length > 0)
+                    staleEvents.Clear();
+
+            foreach (var staleEvents in SystemAPI.Query<DynamicBuffer<ActiveUIEvent>>().WithDisabled<TimelineActive>())
                 if (staleEvents.Length > 0)
                     staleEvents.Clear();
 
@@ -104,8 +133,20 @@ namespace BovineLabs.Timeline.UI
                     continue;
 
                 visible = true;
-                var playerIndex = player.Index;
+
+                // "Player" display value: prefer the resolved entity's stable PlayerId over the raw
+                // entity index (index churns on respawn/pooling and reads as a misleading "P7").
+                // Non-player sources (no PlayerId) fall back to the entity index (TODO.md item 18).
+                var playerIndex = playerIdLookup.TryGetComponent(player, out var playerId)
+                    ? playerId.Value
+                    : player.Index;
+
                 var activeEvents = _activeEvents;
+
+                // Resolution can change mid-clip (link retarget). Any toast captured against a
+                // different source is stale — drop it so it is never re-labelled onto the new entity.
+                DropStaleSourceEvents(activeEvents, player);
+
                 var hasStats = statsLookup.TryGetBuffer(player, out var stats);
 
                 if (hasStats)
@@ -114,10 +155,10 @@ namespace BovineLabs.Timeline.UI
                 if (intrinsicsLookup.TryGetBuffer(player, out var intrinsics))
                     CollectIntrinsics(clipIntrinsics, intrinsics, hasStats, stats, playerIndex, ref intrinsicScratch);
 
-                DecayActiveEvents(activeEvents, dt);
+                DecayActiveEvents(activeEvents, decayDt);
 
                 if (eventsLookup.TryGetBuffer(player, out var conditionEvents))
-                    RefreshActiveEvents(clipEvents, conditionEvents, activeEvents);
+                    RefreshActiveEvents(clipEvents, conditionEvents, activeEvents, player);
 
                 foreach (var active in activeEvents)
                 {
@@ -230,9 +271,17 @@ namespace BovineLabs.Timeline.UI
             }
         }
 
+        // Drops toasts whose captured source no longer matches the currently resolved entity.
+        private static void DropStaleSourceEvents(DynamicBuffer<ActiveUIEvent> activeEvents, Entity source)
+        {
+            for (var i = activeEvents.Length - 1; i >= 0; i--)
+                if (activeEvents[i].Source != source)
+                    activeEvents.RemoveAtSwapBack(i);
+        }
+
         private static void RefreshActiveEvents(
             DynamicBuffer<ClipEvent> clipEvents, DynamicBuffer<ConditionEvent> conditionEvents,
-            DynamicBuffer<ActiveUIEvent> activeEvents)
+            DynamicBuffer<ActiveUIEvent> activeEvents, Entity source)
         {
             var eventMap = conditionEvents.AsMap();
             foreach (var clipEvent in clipEvents)
@@ -242,7 +291,7 @@ namespace BovineLabs.Timeline.UI
 
                 var amount = amountPayload.Read<int>();
 
-                if (TryRefreshExisting(activeEvents, clipEvent, amount))
+                if (TryRefreshExisting(activeEvents, clipEvent, amount, source))
                     continue;
 
                 activeEvents.Add(new ActiveUIEvent
@@ -251,13 +300,14 @@ namespace BovineLabs.Timeline.UI
                     Name = clipEvent.Name,
                     Value = amount,
                     TimeRemaining = clipEvent.Duration,
-                    Duration = clipEvent.Duration
+                    Duration = clipEvent.Duration,
+                    Source = source
                 });
             }
         }
 
         private static bool TryRefreshExisting(
-            DynamicBuffer<ActiveUIEvent> activeEvents, ClipEvent clipEvent, int amount)
+            DynamicBuffer<ActiveUIEvent> activeEvents, ClipEvent clipEvent, int amount, Entity source)
         {
             for (var i = 0; i < activeEvents.Length; i++)
                 if (activeEvents[i].Key.Equals(clipEvent.Key))
@@ -266,6 +316,7 @@ namespace BovineLabs.Timeline.UI
                     ev.Value = amount;
                     ev.TimeRemaining = clipEvent.Duration;
                     ev.Duration = clipEvent.Duration;
+                    ev.Source = source;
                     activeEvents[i] = ev;
                     return true;
                 }

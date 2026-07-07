@@ -36,6 +36,21 @@ namespace BovineLabs.Timeline.UI.Data
         public ushort PoolKey; // which pool/segment fired it (0 = main HP)
         public byte Element;   // damage element/type → tint modifier class (0 = none)
         public byte Flags;     // crit/pierce/self/etc. → modifier classes
+
+        // Frame stamp for the non-destructive lifetime contract. Producers MAY leave this 0 ("unstamped"): the
+        // BarFeedbackDrainSystem stamps 0 → its current frame on first sight, then removes it one frame later. Readers
+        // (HUD driver, world bar) consume only events whose Frame == the drain's current frame — so N readers all see
+        // an event exactly once and none destroys it. 0 is reserved for "unstamped" and never matches a reader.
+        public uint Frame;
+    }
+
+    /// <summary>
+    /// Singleton published by <c>BarFeedbackDrainSystem</c> each frame: the current drain frame counter (never 0).
+    /// Readers compare <see cref="BarFeedbackEvent.Frame"/> against this to consume exactly this frame's events.
+    /// </summary>
+    public struct BarFeedbackFrame : IComponentData
+    {
+        public uint Frame;
     }
 
     /// <summary>
@@ -54,14 +69,6 @@ namespace BovineLabs.Timeline.UI.Data
     {
         GhostSlider = 0,
         DropChip = 1,
-        Both = 2,
-    }
-
-    /// <summary>What ends the HOLD and starts the eased collapse.</summary>
-    public enum CollapseTrigger : byte
-    {
-        Timeout = 0,
-        Signaled = 1,
         Both = 2,
     }
 }

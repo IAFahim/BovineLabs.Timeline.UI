@@ -11,6 +11,21 @@ namespace BovineLabs.Timeline.UI.Data
     }
 
     /// <summary>
+    /// Per-row presentation state the driver advances every frame through <see cref="HudBarMath.AdvanceSlot"/>. It is
+    /// the persistent memory the pure kernel needs (ghost catch-up, hold/flash decay, idle-since-change). Blittable so
+    /// the driver can hold a <c>NativeArray&lt;HudSlotState&gt;</c> sized to the baked entry count.
+    /// </summary>
+    public struct HudSlotState
+    {
+        public float Ghost;
+        public float HoldTimer;
+        public float Flash;
+        public float Idle;
+        public float LastFill;
+        public bool Init;
+    }
+
+    /// <summary>
     /// Pure, deterministic HUD-bar behaviour — fill / ghost(chip) / flash / visibility-fade math. This is a faithful
     /// PORT of the world-space <c>Vex.HealthBar</c> math (HealthBarMath / HealthBarGhost / HealthBarVisibility) so the
     /// screen HUD behaves IDENTICALLY to the in-world bar ("everything the world bar does, the same way") without
@@ -21,6 +36,52 @@ namespace BovineLabs.Timeline.UI.Data
     {
         /// <summary>Fraction filled, clamped 0..1. Zero/negative max → empty (no divide-by-zero).</summary>
         public static float Fill(float current, float max) => max > 0f ? math.saturate(current / max) : 0f;
+
+        /// <summary>
+        /// Advance ONE bar slot's presentation state for a frame and emit the renderable ghost/flash/alpha. This is the
+        /// single behaviour kernel: the driver feeds baked per-row config + the live fill, the kernel owns the state.
+        /// Pure — no Unity/ECS/UI. <paramref name="externalGhost"/> is the FromStat/FromIntrinsic ghost as a fraction;
+        /// <paramref name="healFrac"/> (from a HealSurge feedback event) forces the ghost BELOW fill so the green
+        /// gained-band draws; <paramref name="flashEvent"/> (from a Flash feedback event) pins flash to 1.
+        /// </summary>
+        public static void AdvanceSlot(ref HudSlotState s, HudGhostMode mode, float fill, float externalGhost, float dt,
+            float ghostDelay, float ghostSpeed, bool flashOnDamage, float flashDecay, bool flashEvent, float healFrac,
+            bool alwaysVisible, bool keepVisibleWhileNotFull, bool showOnHealthChange, float autoHideDelay,
+            out float ghost, out float flash, out float alpha, out bool damaged)
+        {
+            const float changeEps = 1e-4f;
+
+            if (!s.Init)
+            {
+                // First sight: snap to fill so a freshly-resolved slot shows no phantom band / flash / hide.
+                s.Ghost = fill;
+                s.LastFill = fill;
+                s.Init = true;
+            }
+
+            damaged = fill < s.LastFill - changeEps;
+            var changed = damaged || fill > s.LastFill + changeEps;
+            s.Idle = changed ? 0f : s.Idle + dt;
+
+            ghost = GhostStep(mode, fill, externalGhost, damaged, dt, ghostDelay, ghostSpeed, ref s.Ghost, ref s.HoldTimer);
+
+            // Heal lead: GhostStep keeps ghost >= fill (the damage side); a heal is the ghost sitting BELOW fill.
+            if (healFrac > 0f)
+            {
+                ghost = math.saturate(fill - healFrac);
+            }
+
+            s.Flash = Flash(flashOnDamage, damaged, s.Flash, dt, flashDecay);
+            if (flashEvent)
+            {
+                s.Flash = 1f;
+            }
+
+            flash = s.Flash;
+            alpha = TargetAlpha(alwaysVisible, 0, keepVisibleWhileNotFull, showOnHealthChange, fill, s.Idle, autoHideDelay);
+
+            s.LastFill = fill;
+        }
 
         /// <summary>Ghost/chip band (always &gt;= fill). ComputedLerp = hold then frame-rate-independent exp catch-up.</summary>
         public static float GhostStep(HudGhostMode mode, float fill, float externalGhost, bool damaged, float dt,
@@ -63,7 +124,7 @@ namespace BovineLabs.Timeline.UI.Data
                         {
                             var t = 1f - math.exp(-speed * dt);
                             ghost = math.lerp(ghost, fill, t);
-                            if (ghost - fill < 1e-3f)
+                            if (ghost - fill < BarFeedbackDefaults.FullEpsilon)
                             {
                                 ghost = fill;
                             }
@@ -104,7 +165,7 @@ namespace BovineLabs.Timeline.UI.Data
                 return 1f;
             }
 
-            var notFull = keepVisibleWhileNotFull && fill < 1f - 1e-3f;
+            var notFull = keepVisibleWhileNotFull && fill < 1f - BarFeedbackDefaults.FullEpsilon;
             var recentlyChanged = showOnHealthChange && (autoHideDelay <= 0f || idle < autoHideDelay);
             return notFull || recentlyChanged ? 1f : 0f;
         }

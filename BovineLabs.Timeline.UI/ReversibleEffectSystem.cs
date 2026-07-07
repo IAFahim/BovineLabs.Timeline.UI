@@ -14,6 +14,8 @@ namespace BovineLabs.Timeline.UI
     {
         private readonly Dictionary<Entity, TInverse> outstanding = new();
         private readonly HashSet<Entity> warned = new();
+        private readonly HashSet<Entity> warnedRetain = new();
+        private readonly List<Entity> warnedScratch = new();
         private EntityQuery animatedQuery;
         private EntityQuery enteredQuery;
         private EntityQuery outstandingQuery;
@@ -27,6 +29,20 @@ namespace BovineLabs.Timeline.UI
         protected virtual bool Ready(VisualElement root)
         {
             return true;
+        }
+
+        /// <summary>
+        /// Optional per-subclass failure reason used in the once-per-entity warning when <see cref="TryApply"/>
+        /// returns false. Return null to keep the generic "unresolved target" message.
+        /// </summary>
+        protected virtual string DescribeFailure(in TData data)
+        {
+            return null;
+        }
+
+        /// <summary>Called at the end of <see cref="OnDestroy"/> after all outstanding effects are reverted.</summary>
+        protected virtual void OnCleanup()
+        {
         }
 
         protected virtual void Advance(Entity entity, in TData data, TInverse inverse, in LocalTime time,
@@ -65,6 +81,7 @@ namespace BovineLabs.Timeline.UI
             foreach (var inverse in outstanding.Values) Revert(inverse);
             outstanding.Clear();
             warned.Clear();
+            OnCleanup();
         }
 
         private void Exit()
@@ -88,8 +105,22 @@ namespace BovineLabs.Timeline.UI
             var entities = enteredQuery.ToEntityArray(Allocator.Temp);
             var data = enteredQuery.ToComponentDataArray<TData>(Allocator.Temp);
 
+            // Retain only entities still present this frame, without boxing the NativeArray enumerator
+            // (IntersectWith takes IEnumerable<T>). Reused scratch collections keep this alloc-free.
             if (warned.Count > 0)
-                warned.IntersectWith(entities);
+            {
+                warnedRetain.Clear();
+                foreach (var entity in entities)
+                    warnedRetain.Add(entity);
+
+                warnedScratch.Clear();
+                foreach (var w in warned)
+                    if (!warnedRetain.Contains(w))
+                        warnedScratch.Add(w);
+
+                for (var s = 0; s < warnedScratch.Count; s++)
+                    warned.Remove(warnedScratch[s]);
+            }
 
             for (var i = 0; i < entities.Length; i++)
             {
@@ -103,8 +134,10 @@ namespace BovineLabs.Timeline.UI
                 }
                 else if (warned.Add(entities[i]))
                 {
-                    BLGlobalLogger.LogWarningString(
-                        $"{GetType().Name}: unresolved target for {entities[i].ToFixedString()}.");
+                    var reason = DescribeFailure(in d);
+                    BLGlobalLogger.LogWarningString(reason != null
+                        ? $"{GetType().Name}: {reason}"
+                        : $"{GetType().Name}: unresolved target for {entities[i].ToFixedString()}.");
                 }
             }
 

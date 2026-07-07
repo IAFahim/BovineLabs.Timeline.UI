@@ -11,16 +11,23 @@ namespace BovineLabs.Timeline.UI
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
-        WorldSystemFilterFlags.ServerSimulation |
         WorldSystemFilterFlags.Presentation)]
     public sealed partial class UxmlViewTrackSystem
         : ReversibleEffectSystem<UxmlViewData, VisualElement, UxmlViewCleanup>
     {
         private IUXMLService uxml;
+        private AnchorApp resolvedApp;
 
         protected override bool Ready(VisualElement root)
         {
-            uxml = AnchorApp.Current.Services.GetService(typeof(IUXMLService)) as IUXMLService;
+            // Cache the service; only re-resolve if we never resolved it or the Anchor app instance changed.
+            var app = AnchorApp.Current;
+            if (uxml == null || !ReferenceEquals(app, resolvedApp))
+            {
+                resolvedApp = app;
+                uxml = app?.Services.GetService(typeof(IUXMLService)) as IUXMLService;
+            }
+
             return uxml != null;
         }
 
@@ -37,6 +44,11 @@ namespace BovineLabs.Timeline.UI
         protected override void Revert(VisualElement inverse)
         {
             inverse?.RemoveFromHierarchy();
+        }
+
+        protected override string DescribeFailure(in UxmlViewData data)
+        {
+            return $"key '{data.UxmlKey.ToString()}' not registered (AnchorSettings ▸ Views).";
         }
 
         private static void Attach(VisualElement view, in UxmlViewData data, VisualElement root)

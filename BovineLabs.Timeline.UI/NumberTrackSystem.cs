@@ -11,7 +11,6 @@ namespace BovineLabs.Timeline.UI
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
-        WorldSystemFilterFlags.ServerSimulation |
         WorldSystemFilterFlags.Presentation)]
     public partial struct NumberTrackSystem : ISystem, ISystemStartStop
     {

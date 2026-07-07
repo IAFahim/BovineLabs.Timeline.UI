@@ -1,7 +1,7 @@
+using System.Collections.Generic;
 using BovineLabs.Anchor;
 using BovineLabs.Core.Extensions;
 using BovineLabs.Core.Iterators;
-using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Essence.Data;
 using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Reaction.Data.Core;
@@ -15,18 +15,27 @@ using UnityEngine.UIElements;
 namespace BovineLabs.Timeline.UI
 {
     /// <summary>
-    /// The ONE generic data-UI driver — a DUMB renderer. It infers NOTHING. Each frame it reads the durable STRUCTURE
-    /// values the game passes (current intrinsic, max stat, optional ghost-slider value, optional locked channel) and
-    /// pushes them as geometry onto the mounted UXML elements (bar-/name-/value-/card-{slot}). The ghost slider's lag is
-    /// driven by the game (a <see cref="BarGhost"/> value); the UI just renders it. No deltas, no decisions.
-    /// Not [BurstCompile]: touches managed <see cref="AnchorApp.Current"/>.
+    /// The ONE generic data-UI driver. It resolves each baked <see cref="UIBindingEntry"/> row to an entity, reads its
+    /// Essence value(s), advances a per-slot presentation state through the single <see cref="HudBarMath"/> kernel
+    /// (ghost / flash / visibility from the baked per-row config), and pushes the result onto the mounted UXML elements
+    /// (bar-/name-/value-/card-{slot}). A <see cref="BarGhost"/> component, when present, is an OPTIONAL sim-authoritative
+    /// ghost override. Managed <see cref="SystemBase"/> (touches <see cref="AnchorApp.Current"/> + holds a managed
+    /// per-panel element cache); never Burst.
+    ///
+    /// FEEDBACK CONSUMPTION (non-destructive, multi-reader): this driver NEVER clears the
+    /// <see cref="BarFeedbackEvent"/> buffer. Lifetime is owned by <see cref="BarFeedbackDrainSystem"/> (LateSimulation),
+    /// which stamps unstamped events with its current frame and removes them one frame later. The driver consumes only
+    /// events whose <see cref="BarFeedbackEvent.Frame"/> == the drain's current frame (published as the
+    /// <see cref="BarFeedbackFrame"/> singleton), so every reader sees each event exactly once and none destroys it. If
+    /// no drain runs in this world the singleton is absent (frame 0) and nothing is consumed — safe no-op, never a
+    /// double-consume.
     /// </summary>
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
         WorldSystemFilterFlags.Presentation)]
-    public partial struct DataUIDriverSystem : ISystem
+    public partial class DataUIDriverSystem : SystemBase
     {
         public const string PanelClass = "vex-hud";
 
@@ -34,28 +43,42 @@ namespace BovineLabs.Timeline.UI
         private UnsafeComponentLookup<EntityLinkSource> sourcesLookup;
         private UnsafeBufferLookup<EntityLinkEntry> linksLookup;
         private ComponentLookup<BarGhost> ghostLookup;
+
         private NativeList<float> chipScratch;
-        private ulong warnedMissingMask;
-        private ulong warnedBadFormatMask;
+        private NativeArray<HudSlotState> slots; // per-row presentation state; sized to the baked entry count
+        private bool[] warnedMissing;            // per-slot 0..255 (Slot is a byte) — no 64-entry cap
+        private bool[] warnedBadFormat;
+        private int warnedKindMask;              // per-FeedbackKind warn-once for unhandled kinds
 
-        public void OnCreate(ref SystemState state)
+        // Managed per-panel element cache. Rebuilt ONLY when the mounted panel set changes — this kills the per-frame
+        // per-slot Q()/string-interpolation storm that was the driver's GC hot path.
+        private readonly List<VisualElement> currentPanels = new();
+        private readonly List<PanelCache> panelCaches = new();
+
+        protected override void OnCreate()
         {
-            this.targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
-            this.sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
-            this.linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
-            this.ghostLookup = state.GetComponentLookup<BarGhost>(true);
+            this.targetsLookup = this.EntityManager.GetUnsafeComponentLookup<Targets>(true);
+            this.sourcesLookup = this.EntityManager.GetUnsafeComponentLookup<EntityLinkSource>(true);
+            this.linksLookup = this.EntityManager.GetUnsafeBufferLookup<EntityLinkEntry>(true);
+            this.ghostLookup = this.GetComponentLookup<BarGhost>(true);
             this.chipScratch = new NativeList<float>(16, Allocator.Persistent);
+            this.warnedMissing = new bool[256];
+            this.warnedBadFormat = new bool[256];
 
-            state.RequireForUpdate<DataUITag>();
-            state.RequireForUpdate<ControllableRegistry>();
+            this.RequireForUpdate<DataUITag>();
+            this.RequireForUpdate<ControllableRegistry>();
         }
 
-        public void OnDestroy(ref SystemState state)
+        protected override void OnDestroy()
         {
             this.chipScratch.Dispose();
+            if (this.slots.IsCreated)
+            {
+                this.slots.Dispose();
+            }
         }
 
-        public void OnUpdate(ref SystemState state)
+        protected override void OnUpdate()
         {
             var app = AnchorApp.Current;
             if (app == null)
@@ -63,37 +86,67 @@ namespace BovineLabs.Timeline.UI
                 return;
             }
 
-            var panels = app.RootVisualElement.Query(className: PanelClass).Build().ToList();
-            if (panels.Count == 0)
+            // One query to find the mounted HUD panels, into a reused list (no per-frame ToList alloc). If the panel set
+            // changed, rebuild the per-slot element cache; otherwise the cache is reused as-is.
+            this.currentPanels.Clear();
+            foreach (var pnl in app.RootVisualElement.Query(className: PanelClass).Build())
+            {
+                this.currentPanels.Add(pnl);
+            }
+
+            if (this.currentPanels.Count == 0)
             {
                 return;
             }
 
             var entries = SystemAPI.GetSingletonBuffer<UIBindingEntry>(true);
+
+            if (this.PanelsChanged())
+            {
+                this.RebuildCache(entries);
+            }
+
             var players = SystemAPI.GetSingleton<ControllableRegistry>();
             var intrinsics = SystemAPI.GetBufferLookup<Intrinsic>(true);
             var stats = SystemAPI.GetBufferLookup<Stat>(true);
             var events = SystemAPI.GetBufferLookup<ConditionEvent>(true);
-            var feedback = SystemAPI.GetBufferLookup<BarFeedbackEvent>(false);
+            var feedback = SystemAPI.GetBufferLookup<BarFeedbackEvent>(true); // READ-ONLY: the drain system owns removal
 
-            this.targetsLookup.Update(ref state);
-            this.sourcesLookup.Update(ref state);
-            this.linksLookup.Update(ref state);
-            this.ghostLookup.Update(ref state);
-            state.Dependency.Complete();
+            // Narrow sync: main-thread UI reads need these types settled, but a full-graph Dependency.Complete() is not
+            // required. One completion per lookup/consumer below — ADD to this list if you add a lookup.
+            var em = this.EntityManager;
+            em.CompleteDependencyBeforeRO<Intrinsic>();        // ReadValue: numerator / max / locked
+            em.CompleteDependencyBeforeRO<Stat>();             // ReadValue: max / stat
+            em.CompleteDependencyBeforeRO<ConditionEvent>();   // ReadValue: event
+            em.CompleteDependencyBeforeRO<Targets>();          // UISourceResolver route
+            em.CompleteDependencyBeforeRO<EntityLinkSource>(); // UISourceResolver link source
+            em.CompleteDependencyBeforeRO<EntityLinkEntry>();  // UISourceResolver link map
+            em.CompleteDependencyBeforeRO<BarGhost>();         // optional sim-authoritative ghost override
+            em.CompleteDependencyBeforeRO<BarFeedbackEvent>(); // non-destructive feedback read (drain is the sole writer)
+
+            this.targetsLookup.Update(this);
+            this.sourcesLookup.Update(this);
+            this.linksLookup.Update(this);
+            this.ghostLookup.Update(this);
+
+            this.EnsureSlots(entries.Length);
+
+            var currentFrame = SystemAPI.TryGetSingleton<BarFeedbackFrame>(out var bff) ? bff.Frame : 0u;
+            var dt = math.min((float)SystemAPI.Time.DeltaTime, 0.1f); // clamp hitch so ghost/flash catch-up stays sane
 
             for (var i = 0; i < entries.Length; i++)
             {
                 var e = entries[i];
-                var slot = e.Slot; // real index for element lookups; only the warn-mask shift is 64-guarded below
 
                 var alive = UISourceResolver.TryResolve(
                     e.Source, Entity.Null, players, this.targetsLookup, this.sourcesLookup, this.linksLookup, out var entity)
                     && entity != Entity.Null;
 
-                float fill = 0f, ghostFrac = 0f, lockedFrac = 0f, current = 0f, max = 0f;
-                var ready = false; // a Bar row is "ready" only once its max denominator exists — else it's a false-empty bar
+                float fill = 0f, ghostFrac = 0f, lockedFrac = 0f, current = 0f, max = 0f, flash = 0f, alpha = 0f;
+                var ready = false;
                 this.chipScratch.Clear();
+
+                var s = this.slots[i];
 
                 if (alive)
                 {
@@ -103,13 +156,65 @@ namespace BovineLabs.Timeline.UI
 
                     current = ReadValue(e.ValueKind, e.ValueKey, intrBuf, hasIntr, statBuf, hasStat, evBuf, hasEvent);
                     max = e.MaxKey != 0 ? ReadValue(e.MaxKind, e.MaxKey, intrBuf, hasIntr, statBuf, hasStat, evBuf, hasEvent) : 0f;
-                    current = math.select(0f, current, math.isfinite(current)); // dumb renderer trusts clean structure; sanitize once
+                    current = math.select(0f, current, math.isfinite(current)); // sanitize once; the renderer trusts clean structure
                     max = math.select(0f, max, math.isfinite(max));
                     ready = e.MaxKey == 0 || max > 0f;
                     fill = HudBarMath.Fill(current, max);
 
-                    // ghost slider: a value the GAME passes (lags/leads); the UI just renders it. Default = fill (no band).
-                    ghostFrac = fill;
+                    // FEEDBACK inbox → non-destructive read of THIS frame's stamped events (see class remarks).
+                    var healFrac = 0f;
+                    var flashEvent = false;
+                    if (currentFrame != 0u && feedback.TryGetBuffer(entity, out var fb))
+                    {
+                        for (var k = 0; k < fb.Length; k++)
+                        {
+                            var evt = fb[k];
+                            if (evt.Frame != currentFrame)
+                            {
+                                continue; // not this frame's event (drain removes it next frame)
+                            }
+
+                            switch (evt.Kind)
+                            {
+                                case FeedbackKind.DamageChip:
+                                    if (max > 0f)
+                                    {
+                                        this.chipScratch.Add((float)System.Math.Abs((long)evt.Amount) / max);
+                                    }
+
+                                    break;
+                                case FeedbackKind.HealSurge:
+                                    if (max > 0f)
+                                    {
+                                        healFrac += (float)System.Math.Abs((long)evt.Amount) / max;
+                                    }
+
+                                    break;
+                                case FeedbackKind.Flash:
+                                    flashEvent = true;
+                                    break;
+                                default:
+                                    this.WarnUnhandledKind(evt.Kind);
+                                    break;
+                            }
+                        }
+                    }
+
+                    // External ghost source (FromStat/FromIntrinsic) as a fraction; the kernel consumes it.
+                    var extGhost = 0f;
+                    if (max > 0f && (e.GhostMode == HudGhostMode.FromStat || e.GhostMode == HudGhostMode.FromIntrinsic))
+                    {
+                        var gKind = e.GhostMode == HudGhostMode.FromStat ? UIValueKind.Stat : UIValueKind.Intrinsic;
+                        extGhost = ReadValue(gKind, e.GhostKey, intrBuf, hasIntr, statBuf, hasStat, evBuf, hasEvent) / max;
+                    }
+
+                    // ONE behaviour kernel: ghost / flash / visibility from the baked per-row config + slot state.
+                    HudBarMath.AdvanceSlot(ref s, e.GhostMode, fill, extGhost, dt,
+                        e.GhostDelay, e.GhostSpeed, e.FlashOnDamage != 0, e.FlashDecay, flashEvent, healFrac,
+                        e.AlwaysVisible != 0, e.KeepVisibleWhileNotFull != 0, e.ShowOnHealthChange != 0, e.AutoHideDelay,
+                        out ghostFrac, out flash, out alpha, out _);
+
+                    // BarGhost is an OPTIONAL sim-authoritative override (e.g. the sample conductor); it wins when present.
                     if (this.ghostLookup.TryGetComponent(entity, out var bg) && max > 0f)
                     {
                         ghostFrac = math.saturate(bg.Value / max);
@@ -120,104 +225,225 @@ namespace BovineLabs.Timeline.UI
                         var locked = intrBuf.GetValue((IntrinsicKey)e.LockedKey, 0);
                         lockedFrac = max > 0f ? math.saturate(locked / max) : 0f;
                     }
-
-                    // FEEDBACK inbox → chip amounts (drain once, then clear). Damage is TOLD, never inferred.
-                    if (feedback.TryGetBuffer(entity, out var fb) && fb.Length > 0)
-                    {
-                        if (max > 0f)
-                        {
-                            for (var k = 0; k < fb.Length; k++)
-                            {
-                                if (fb[k].Kind == FeedbackKind.DamageChip)
-                                {
-                                    this.chipScratch.Add(math.abs(fb[k].Amount) / max);
-                                }
-                            }
-                        }
-
-                        fb.Clear();
-                    }
-                }
-
-                var show = alive && ready && (e.AlwaysVisible != 0 || (e.KeepVisibleWhileNotFull != 0 && fill < 0.999f) || math.abs(ghostFrac - fill) > 0.003f);
-
-                this.Push(panels, slot, show, math.saturate(fill), math.saturate(ghostFrac), math.saturate(lockedFrac), current, max, e.Label, e.Format, in e);
-            }
-        }
-
-        private void Push(System.Collections.Generic.List<VisualElement> panels, byte slot, bool show,
-            float fill, float ghostFrac, float lockedFrac, float current, float max, FixedString64Bytes label, FixedString64Bytes format, in UIBindingEntry e)
-        {
-            // Value text computed ONCE and GUARDED — a pure renderer must never throw on a designer's malformed Format.
-            var valueText = string.Empty;
-            if (show)
-            {
-                if (!format.IsEmpty)
-                {
-                    try
-                    {
-                        valueText = string.Format(format.ToString(), (int)math.round(current), (int)math.round(max));
-                    }
-                    catch (System.FormatException)
-                    {
-                        valueText = AutoText(current, max);
-                        if (slot < 64 && (this.warnedBadFormatMask & (1UL << slot)) == 0)
-                        {
-                            this.warnedBadFormatMask |= 1UL << slot;
-                            UnityEngine.Debug.LogWarning($"[DataUI] Row {slot} ('{label}') Format '{format}' is invalid — using default. Use '{{0}}' (current) / '{{1}}' (max).");
-                        }
-                    }
                 }
                 else
                 {
-                    valueText = AutoText(current, max);
-                }
-            }
-
-            var saw = false;
-            for (var p = 0; p < panels.Count; p++)
-            {
-                var panel = panels[p];
-
-                if (panel.Q($"card-{slot}") is { } card)
-                {
-                    saw = true;
-                    card.EnableInClassList("is-hidden", !show);
+                    s = default; // reset so a re-resolve snaps clean (no phantom ghost/flash/idle carryover)
                 }
 
-                if (panel.Q($"bar-{slot}") is HudBar bar)
-                {
-                    saw = true;
-                    bar.SetTrailConfig((TrailMode)e.TrailMode, e.Accumulate != 0, e.HoldMs, e.DrainMs, e.MinDrainMs, (EaseId)e.DrainEase, e.Fade != 0, e.MinChipFrac);
-                    bar.value = fill; // set BEFORE AddChip — the chip top = live fill + amount
-                    bar.ghost = ghostFrac;
-                    bar.locked = lockedFrac;
-                    for (var k = 0; k < this.chipScratch.Length; k++)
-                    {
-                        bar.AddChip(this.chipScratch[k]);
-                    }
-                }
+                this.slots[i] = s;
 
-                if (panel.Q<Label>($"name-{slot}") is { } nameLabel)
-                {
-                    nameLabel.text = label.ToString();
-                }
-
-                if (panel.Q<Label>($"value-{slot}") is { } valueLabel)
-                {
-                    valueLabel.text = valueText;
-                }
-            }
-
-            if (!saw && slot < 64 && (this.warnedMissingMask & (1UL << slot)) == 0)
-            {
-                this.warnedMissingMask |= 1UL << slot;
-                UnityEngine.Debug.LogWarning($"[DataUI] Row slot {slot} ('{label}') has no 'card-{slot}'/'bar-{slot}' element in the mounted UXML.");
+                var show = alive && ready && alpha > 0.5f;
+                this.Push(i, show, math.saturate(fill), math.saturate(ghostFrac), math.saturate(lockedFrac), math.saturate(flash), current, max, in e);
             }
         }
 
-        private static string AutoText(float current, float max) =>
-            max > 0f ? $"{(int)math.round(current)} / {(int)math.round(max)}" : ((int)math.round(current)).ToString();
+        private void Push(int i, bool show, float fill, float ghost, float locked, float flash, float current, float max, in UIBindingEntry e)
+        {
+            var curInt = (int)math.round(current);
+            var maxInt = (int)math.round(max);
+
+            for (var p = 0; p < this.panelCaches.Count; p++)
+            {
+                var se = this.panelCaches[p].Slots[i];
+                if (se == null)
+                {
+                    continue;
+                }
+
+                if (!se.Primed || se.LastShow != show)
+                {
+                    se.Card?.EnableInClassList("is-hidden", !show);
+                    se.LastShow = show;
+                }
+
+                if (se.Bar != null)
+                {
+                    if (!se.ConfigApplied)
+                    {
+                        // Config is bake-static → SetTrailConfig ONCE per cache build, not every frame.
+                        se.Bar.SetTrailConfig((TrailMode)e.TrailMode, e.Accumulate != 0, e.HoldMs, e.DrainMs, e.MinDrainMs, (EaseId)e.DrainEase, e.Fade != 0, e.MinChipFrac, e.DrainRate);
+                        se.ConfigApplied = true;
+                    }
+
+                    if (!se.Primed || Changed(se.LastFill, fill) || Changed(se.LastGhost, ghost) || Changed(se.LastLocked, locked) || Changed(se.LastFlash, flash))
+                    {
+                        se.Bar.SetState(fill, ghost, locked, flash); // ONE ApplyStructure vs three property setters
+                        se.LastFill = fill;
+                        se.LastGhost = ghost;
+                        se.LastLocked = locked;
+                        se.LastFlash = flash;
+                    }
+
+                    // Chips are TOLD per explicit event; SetState (above) set the fill first so the chip top = fill + amount.
+                    for (var k = 0; k < this.chipScratch.Length; k++)
+                    {
+                        se.Bar.AddChip(this.chipScratch[k]);
+                    }
+                }
+
+                if (se.Value != null)
+                {
+                    if (show)
+                    {
+                        // Recompute the value string only when the ROUNDED ints change — string.Format is the alloc we kill.
+                        if (!se.Primed || curInt != se.LastCur || maxInt != se.LastMax)
+                        {
+                            se.LastCur = curInt;
+                            se.LastMax = maxInt;
+                            var valueText = this.FormatValue(e, curInt, maxInt);
+                            if (se.LastValueText != valueText)
+                            {
+                                se.Value.text = valueText;
+                                se.LastValueText = valueText;
+                            }
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(se.LastValueText))
+                    {
+                        se.Value.text = string.Empty;
+                        se.LastValueText = string.Empty;
+                        se.LastCur = int.MinValue;
+                        se.LastMax = int.MinValue;
+                    }
+                }
+
+                se.Primed = true;
+            }
+        }
+
+        private string FormatValue(in UIBindingEntry e, int curInt, int maxInt)
+        {
+            if (!e.Format.IsEmpty)
+            {
+                try
+                {
+                    return string.Format(e.Format.ToString(), curInt, maxInt);
+                }
+                catch (System.FormatException)
+                {
+                    var slot = e.Slot;
+                    if (!this.warnedBadFormat[slot])
+                    {
+                        this.warnedBadFormat[slot] = true;
+                        UnityEngine.Debug.LogWarning($"[DataUI] Row {slot} ('{e.Label}') Format '{e.Format}' is invalid — using default. Use '{{0}}' (current) / '{{1}}' (max).");
+                    }
+
+                    return AutoText(curInt, maxInt);
+                }
+            }
+
+            return AutoText(curInt, maxInt);
+        }
+
+        private bool PanelsChanged()
+        {
+            if (this.currentPanels.Count != this.panelCaches.Count)
+            {
+                return true;
+            }
+
+            for (var p = 0; p < this.currentPanels.Count; p++)
+            {
+                if (this.panelCaches[p].Panel != this.currentPanels[p])
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void RebuildCache(DynamicBuffer<UIBindingEntry> entries)
+        {
+            this.panelCaches.Clear();
+
+            // Reset the missing-element warn-once so a fixed UXML re-warns if it is still broken after a remount.
+            System.Array.Clear(this.warnedMissing, 0, this.warnedMissing.Length);
+
+            for (var p = 0; p < this.currentPanels.Count; p++)
+            {
+                var panel = this.currentPanels[p];
+                var pc = new PanelCache { Panel = panel, Slots = new SlotElements[entries.Length] };
+
+                for (var i = 0; i < entries.Length; i++)
+                {
+                    var e = entries[i];
+                    var key = e.SlotName.IsEmpty ? e.Slot.ToString() : e.SlotName.ToString(); // computed ONCE per cache build
+                    var se = new SlotElements
+                    {
+                        Card = panel.Q("card-" + key),
+                        Bar = panel.Q<HudBar>("bar-" + key),
+                        Name = panel.Q<Label>("name-" + key),
+                        Value = panel.Q<Label>("value-" + key),
+                    };
+
+                    if (se.Name != null)
+                    {
+                        se.Name.text = e.Label.ToString(); // static → set once, never per frame
+                    }
+
+                    pc.Slots[i] = se;
+                }
+
+                this.panelCaches.Add(pc);
+            }
+
+            // Missing-element warn-once: a row with no card/bar in ANY mounted panel.
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var e = entries[i];
+                var found = false;
+                for (var p = 0; p < this.panelCaches.Count; p++)
+                {
+                    var se = this.panelCaches[p].Slots[i];
+                    if (se.Card != null || se.Bar != null)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found && !this.warnedMissing[e.Slot])
+                {
+                    this.warnedMissing[e.Slot] = true;
+                    var key = e.SlotName.IsEmpty ? e.Slot.ToString() : e.SlotName.ToString();
+                    UnityEngine.Debug.LogWarning($"[DataUI] Row slot '{key}' ('{e.Label}') has no 'card-{key}'/'bar-{key}' element in the mounted UXML.");
+                }
+            }
+        }
+
+        private void EnsureSlots(int count)
+        {
+            if (this.slots.IsCreated && this.slots.Length == count)
+            {
+                return;
+            }
+
+            if (this.slots.IsCreated)
+            {
+                this.slots.Dispose();
+            }
+
+            this.slots = new NativeArray<HudSlotState>(count, Allocator.Persistent); // default → Init=false → first frame snaps
+        }
+
+        private void WarnUnhandledKind(FeedbackKind kind)
+        {
+            var bit = 1 << (int)kind;
+            if ((this.warnedKindMask & bit) != 0)
+            {
+                return;
+            }
+
+            this.warnedKindMask |= bit;
+            UnityEngine.Debug.LogWarning($"[DataUI] Feedback kind '{kind}' is not yet rendered by the HUD driver (only DamageChip/HealSurge/Flash). Event ignored (reserved).");
+        }
+
+        private static bool Changed(float a, float b) => math.abs(a - b) > BarFeedbackDefaults.GhostEpsilon;
+
+        private static string AutoText(int curInt, int maxInt) =>
+            maxInt > 0 ? $"{curInt} / {maxInt}" : curInt.ToString();
 
         private static float ReadValue(UIValueKind kind, ushort key,
             in DynamicBuffer<Intrinsic> intr, bool hasIntr, in DynamicBuffer<Stat> st, bool hasStat,
@@ -232,6 +458,33 @@ namespace BovineLabs.Timeline.UI
                 default:
                     return hasIntr ? intr.GetValue((IntrinsicKey)key, 0) : 0f;
             }
+        }
+
+        /// <summary>Per-panel resolved elements for every row, rebuilt only when the panel set changes.</summary>
+        private sealed class PanelCache
+        {
+            public VisualElement Panel;
+            public SlotElements[] Slots;
+        }
+
+        /// <summary>One row's resolved elements + change-detection state for a single panel.</summary>
+        private sealed class SlotElements
+        {
+            public VisualElement Card;
+            public HudBar Bar;
+            public Label Name;
+            public Label Value;
+
+            public float LastFill;
+            public float LastGhost;
+            public float LastLocked;
+            public float LastFlash;
+            public string LastValueText;
+            public int LastCur = int.MinValue;
+            public int LastMax = int.MinValue;
+            public bool LastShow;
+            public bool ConfigApplied;
+            public bool Primed; // first push writes every channel unconditionally, then change-only
         }
     }
 }

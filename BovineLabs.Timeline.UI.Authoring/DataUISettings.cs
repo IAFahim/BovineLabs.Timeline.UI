@@ -43,10 +43,26 @@ namespace BovineLabs.Timeline.UI.Authoring
                 panels.Add(new UIPanelEntry { Key = Clip(key) });
             }
 
+            // Slot is a byte and couples to card-{slot} element names: past 255 it wraps → wrong data on every card.
+            if (this.Rows.Count > byte.MaxValue)
+            {
+                UnityEngine.Debug.LogError($"[DataUI] {this.Rows.Count} rows exceeds 255 — the slot index is a byte and would wrap. Split the HUD across multiple panels/settings.");
+            }
+
+            var seenSlots = new HashSet<string>();
+
             var rows = baker.AddBuffer<UIBindingEntry>(entity);
             for (var i = 0; i < this.Rows.Count; i++)
             {
                 var r = this.Rows[i];
+
+                // Resolved slot name: explicit SlotName wins, else the list index. Duplicates silently bind two rows to
+                // one card, so error at bake rather than let a designer chase a "stuck" card at runtime.
+                var resolvedSlot = string.IsNullOrEmpty(r.SlotName) ? i.ToString() : r.SlotName;
+                if (!seenSlots.Add(resolvedSlot))
+                {
+                    UnityEngine.Debug.LogError($"[DataUI] Row {i} ('{r.Label}'): duplicate slot '{resolvedSlot}' — two rows resolve to the same card-{resolvedSlot}. Give each row a unique SlotName.");
+                }
 
                 // DependsOn EVERY managed ref so editing a schema/source/link re-bakes the SubScene.
                 if (r.Source.link != null) baker.DependsOn(r.Source.link);
@@ -91,9 +107,9 @@ namespace BovineLabs.Timeline.UI.Authoring
                     mKey = 0; // generic single readout — no max fraction
                     gMode = HudGhostMode.Off;
                     gKey = 0;
-                    gDelay = 0.4f;
-                    gSpeed = 6f;
-                    fDecay = 0.25f;
+                    gDelay = BarFeedbackDefaults.GhostDelay;
+                    gSpeed = BarFeedbackDefaults.GhostSpeed;
+                    fDecay = BarFeedbackDefaults.FlashDecay;
                     lockedKey = 0;
                 }
 
@@ -131,6 +147,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 rows.Add(new UIBindingEntry
                 {
                     Slot = (byte)i,
+                    SlotName = Clip(r.SlotName),
                     Source = r.Source.ToComponent(baker),
                     ValueKind = vKind,
                     ValueKey = vKey,
@@ -152,13 +169,15 @@ namespace BovineLabs.Timeline.UI.Authoring
                     ShowOnHealthChange = B(r.ShowOnHealthChange),
                     FlashOnDamage = B(r.FlashOnDamage),
                     TrailMode = (byte)(prof != null ? (byte)prof.trailMode : (byte)TrailMode.Both),
-                    Accumulate = B(prof == null || prof.accumulate),
-                    Fade = B(prof == null || prof.fade),
-                    DrainEase = (byte)(prof != null ? (byte)prof.drainEase : (byte)EaseId.OutCubic),
-                    HoldMs = prof != null ? prof.holdMs : 400f,
-                    DrainMs = prof != null ? prof.drainMs : 500f,
-                    MinDrainMs = prof != null ? prof.minDrainMs : 120f,
-                    MinChipFrac = prof != null ? prof.minChipFrac : 0.005f,
+                    Accumulate = B(prof == null ? BarFeedbackDefaults.Accumulate : prof.accumulate),
+                    Fade = B(prof == null ? BarFeedbackDefaults.Fade : prof.fade),
+                    DrainEase = (byte)(prof != null ? (byte)prof.drainEase : (byte)BarFeedbackDefaults.DrainEase),
+                    HoldMs = prof != null ? prof.holdMs : BarFeedbackDefaults.HoldMs,
+                    DrainMs = prof != null ? prof.drainMs : BarFeedbackDefaults.DrainMs,
+                    MinDrainMs = prof != null ? prof.minDrainMs : BarFeedbackDefaults.MinDrainMs,
+                    DrainRate = prof != null ? prof.drainRate : BarFeedbackDefaults.DrainRate,
+                    FadeMs = prof != null ? prof.fadeMs : BarFeedbackDefaults.FadeMs,
+                    MinChipFrac = prof != null ? prof.minChipFrac : BarFeedbackDefaults.MinChipFrac,
                 });
             }
         }
@@ -194,6 +213,9 @@ namespace BovineLabs.Timeline.UI.Authoring
             public ConditionSchemaObject Value;
 
             [Header("Presentation")]
+            [Tooltip("Optional explicit slot name → binds card-{SlotName}/bar-{SlotName}/… instead of card-{index}. " +
+                     "Set this so reordering rows never silently rewires cards. Empty = use the list index. Must be unique.")]
+            public string SlotName;
             public UIRowKind Kind = UIRowKind.Bar;
             public string Label;
             [Tooltip("Composite format, e.g. '{0:0} / {1:0}' (arg0=current, arg1=max). Empty = auto.")]
