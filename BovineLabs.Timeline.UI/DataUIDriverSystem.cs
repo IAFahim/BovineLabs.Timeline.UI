@@ -1,6 +1,7 @@
 using BovineLabs.Anchor;
 using BovineLabs.Core.Extensions;
 using BovineLabs.Core.Iterators;
+using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Essence.Data;
 using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Reaction.Data.Core;
@@ -227,7 +228,7 @@ namespace BovineLabs.Timeline.UI
                 case UIValueKind.Stat:
                     return hasStat ? st.GetValueFloat((StatKey)key, 0f) : 0f;
                 case UIValueKind.Event:
-                    return hasEvent && ev.AsMap().TryGetValue((ConditionKey)key, out var c) ? c.Read<int>() : 0f;
+                    return hasEvent && ev.AsMap().TryGetValue(new ConditionKey(new BLId(key)), out var c) ? c.Read<int>() : 0f;
                 default:
                     return hasIntr ? intr.GetValue((IntrinsicKey)key, 0) : 0f;
             }

@@ -1,5 +1,6 @@
 using System;
 using BovineLabs.Anchor;
+using BovineLabs.Core.ObjectManagement;
 using Unity.Collections;
 using Unity.Properties;
 
@@ -48,7 +49,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             public struct StatRow : IEquatable<StatRow>
             {
                 public int Player;
-                public ushort Key;
+                public BLId Key;
                 public FixedString32Bytes RawName;
                 public int Added;
                 public float Multi;
@@ -66,7 +67,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
 
                 public override int GetHashCode()
                 {
-                    return unchecked((Player * 397) ^ (Key << 8) ^ Added);
+                    return unchecked((Player * 397) ^ (Key.RawValue << 8) ^ Added);
                 }
             }
 
@@ -74,7 +75,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             public struct IntrinsicRow : IEquatable<IntrinsicRow>
             {
                 public int Player;
-                public ushort Key;
+                public BLId Key;
                 public FixedString32Bytes RawName;
                 public int Current;
                 public int Min;
@@ -94,7 +95,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
 
                 public override int GetHashCode()
                 {
-                    return unchecked((Player * 397) ^ (Key << 8) ^ Current);
+                    return unchecked((Player * 397) ^ (Key.RawValue << 8) ^ Current);
                 }
             }
 
@@ -102,7 +103,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             public struct EventRow : IEquatable<EventRow>
             {
                 public int Player;
-                public int Key;
+                public BLId Key;
                 public FixedString32Bytes RawName;
                 public int Amount;
                 public float TimeRemaining;
@@ -122,7 +123,7 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
 
                 public override int GetHashCode()
                 {
-                    return unchecked((Player * 397) ^ (Key << 8) ^ Amount);
+                    return unchecked((Player * 397) ^ (Key.RawValue << 8) ^ Amount);
                 }
             }
         }

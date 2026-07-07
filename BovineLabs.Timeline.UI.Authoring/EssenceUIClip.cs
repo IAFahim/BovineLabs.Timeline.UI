@@ -1,6 +1,7 @@
 using System;
 using BovineLabs.Essence.Authoring;
 using BovineLabs.Reaction.Authoring.Conditions;
+using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Timeline.Authoring;
 using BovineLabs.Timeline.UI.Data;
 using Unity.Entities;
@@ -63,7 +64,7 @@ namespace BovineLabs.Timeline.UI.Authoring
 
             foreach (var s in Stats)
                 if (s != null)
-                    statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
+                    statBuffer.Add(new ClipStat { Key = s.Key.ID, Name = s.name });
         }
 
         private void BakeIntrinsics(Entity clipEntity, BakingContext context)
@@ -76,7 +77,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 if (i != null)
                     intBuffer.Add(new ClipIntrinsic
                     {
-                        Key = i.Key, Name = i.name,
+                        Key = i.Key.ID, Name = i.name,
                         Min = i.Range.x, Max = i.Range.y,
                         MinStat = i.MinStat, MaxStat = i.MaxStat
                     });
@@ -91,7 +92,7 @@ namespace BovineLabs.Timeline.UI.Authoring
             foreach (var e in Events)
                 if (e.Event != null)
                     evBuffer.Add(new ClipEvent
-                        { Key = e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
+                        { Key = new ConditionKey(e.Event.Key), Name = e.Event.name, Duration = e.DisplayDuration });
         }
     }
 }
