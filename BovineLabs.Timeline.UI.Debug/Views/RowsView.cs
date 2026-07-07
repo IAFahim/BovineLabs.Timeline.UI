@@ -14,8 +14,13 @@ namespace BovineLabs.Timeline.UI.Debug.Views
     {
         private readonly GridView grid;
 
-        public RowsView()
-            : base(new RowsViewModel())
+        /// <remarks>
+        /// The view-model MUST be constructor-injected: the track systems pin the DI singleton via
+        /// <c>UIHelper.Bind()</c> → <c>IViewModelService.Load</c>. A view that news its own VM renders
+        /// a different object and never sees system data.
+        /// </remarks>
+        public RowsView(RowsViewModel viewModel)
+            : base(viewModel)
         {
             grid = new GridView
             {

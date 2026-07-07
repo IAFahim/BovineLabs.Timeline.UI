@@ -19,8 +19,13 @@ namespace BovineLabs.Timeline.UI
         private readonly GridView intrinsics;
         private readonly GridView stats;
 
-        public EssenceUIView()
-            : base(new EssenceUIViewModel())
+        /// <remarks>
+        /// The view-model MUST be constructor-injected: the track systems pin the DI singleton via
+        /// <c>UIHelper.Bind()</c> → <c>IViewModelService.Load</c>. A view that news its own VM renders
+        /// a different object and never sees system data.
+        /// </remarks>
+        public EssenceUIView(EssenceUIViewModel viewModel)
+            : base(viewModel)
         {
             intrinsics = Build(MakeIntrinsic, BindIntrinsic, ViewModel.Intrinsics);
             stats = Build(MakeStat, BindStat, ViewModel.Stats);
