@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="DamageVignette.uss" />
+    <!-- Damage vignette overlay. DamageVignetteSystem drives `opacity` on the element(s) below from BarFeedbackEvents.
+         MULTI-PLAYER / MULTI-VIEWPORT: the system prefers a per-player element named `damage-vignette-{player}` and
+         positions it to that player's viewport (resolved via HudViewport — full-screen today, split-screen later). If
+         only the shared `damage-vignette` exists, every player's damage drives the one full-screen overlay. Author extra
+         per-seat overlays by copying the element with the next index; no code change. -->
+    <ui:VisualElement name="damage-vignette" class="vex-vignette" picking-mode="Ignore" />
+</ui:UXML>
