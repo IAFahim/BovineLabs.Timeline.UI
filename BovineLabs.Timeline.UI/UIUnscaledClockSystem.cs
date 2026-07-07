@@ -45,9 +45,14 @@ namespace BovineLabs.Timeline.UI
 #else
             var paused = false;
 #endif
+            // NOTE: keep this expression hoisted out of the SystemAPI.SetSingleton call.
+            // The Entities source generator (6000.7.0a1) mis-rewrites fully-qualified
+            // `UnityEngine.Time` inside rewritten SystemAPI invocations, emitting
+            // `UIClock.Step(.unscaledDeltaTime, ...)` in the #line-mapped partial (CS1001).
+            var deltaTime = UIClock.Step(UnityEngine.Time.unscaledDeltaTime, paused);
             SystemAPI.SetSingleton(new UIUnscaledTime
             {
-                DeltaTime = UIClock.Step(UnityEngine.Time.unscaledDeltaTime, paused),
+                DeltaTime = deltaTime,
             });
         }
     }
