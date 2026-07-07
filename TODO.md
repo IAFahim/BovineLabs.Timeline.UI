@@ -1,5 +1,7 @@
 # TODO.md — BovineLabs.Timeline.UI production audit
 
+> **Verification status (2026-07-07):** All landed fixes compile clean (editor refresh finished 13:42:35Z, error console empty) and the full `BovineLabs.Timeline.UI` EditMode sweep is green: **96/96 passed, 0 failed, 0 skipped** at superproject HEAD `609b325`. Grid.Influence/VFXForge working-tree dirt is the concurrent session's work (submodule-internal mods / pointer drift from `e6ca6fd`,`ec90289`) — untouched by this audit's commits.
+
 ## Executive Summary
 
 The package is a well-layered two-family system (reversible VisualElement effects + ViewModel/driver HUD) with genuinely good bones: pure, tested math helpers, cleanup-component-based revert, bake-time validation messages, and a clean Data/Runtime/Authoring asmdef split. The biggest risks are NOT in what exists — they are in what is **half-wired**:

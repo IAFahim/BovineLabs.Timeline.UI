@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using BovineLabs.Anchor;
 using BovineLabs.Core.Extensions;
 using BovineLabs.Core.Iterators;
+using BovineLabs.Core.ObjectManagement;
 using BovineLabs.Essence.Data;
 using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Reaction.Data.Core;
@@ -57,9 +58,10 @@ namespace BovineLabs.Timeline.UI
 
         protected override void OnCreate()
         {
-            this.targetsLookup = this.EntityManager.GetUnsafeComponentLookup<Targets>(true);
-            this.sourcesLookup = this.EntityManager.GetUnsafeComponentLookup<EntityLinkSource>(true);
-            this.linksLookup = this.EntityManager.GetUnsafeBufferLookup<EntityLinkEntry>(true);
+            ref var state = ref this.CheckedStateRef;
+            this.targetsLookup = state.GetUnsafeComponentLookup<Targets>(true);
+            this.sourcesLookup = state.GetUnsafeComponentLookup<EntityLinkSource>(true);
+            this.linksLookup = state.GetUnsafeBufferLookup<EntityLinkEntry>(true);
             this.ghostLookup = this.GetComponentLookup<BarGhost>(true);
             this.chipScratch = new NativeList<float>(16, Allocator.Persistent);
             this.warnedMissing = new bool[256];
