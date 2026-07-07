@@ -1,14 +1,18 @@
 using System;
 using System.ComponentModel;
 using BovineLabs.Anchor;
+using BovineLabs.Anchor.Debug.Toolbar;
 using BovineLabs.Timeline.UI.Data.ViewModel;
 using Unity.AppUI.UI;
+using UnityEngine.Scripting;
 using UnityEngine.UIElements;
 
 #if UNITY_EDITOR || BL_DEBUG
 
 namespace BovineLabs.Timeline.UI.Debug.Views
 {
+    [Preserve]
+    [AutoToolbar("Rows", "Timeline UI")]
     [Transient]
     public class RowsView : View<RowsViewModel>, IDisposable
     {
