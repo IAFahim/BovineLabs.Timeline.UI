@@ -8,10 +8,11 @@ using Unity.Entities;
 namespace BovineLabs.Timeline.UI
 {
     [UpdateInGroup(typeof(InitializationSystemGroup))]
+    // ServerSimulation deliberately excluded: nothing in this package (nor the feedback bridge)
+    // reads ControllableRegistry on a server — the registry only feeds presentation-side UI.
     [WorldSystemFilter(
         WorldSystemFilterFlags.LocalSimulation |
         WorldSystemFilterFlags.ClientSimulation |
-        WorldSystemFilterFlags.ServerSimulation |
         WorldSystemFilterFlags.Presentation)]
     public partial struct ControllableRegistrySystem : ISystem
     {
