@@ -165,13 +165,13 @@ namespace BovineLabs.Timeline.UI
 
                 foreach (var active in activeEvents)
                 {
-                    if (ContainsEvent(eventScratch, playerIndex, active.Key.Value))
+                    if (ContainsEvent(eventScratch, playerIndex, new BLId(active.Key.Value)))
                         continue;
 
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {
                         Player = playerIndex,
-                        Key = active.Key.Value,
+                        Key = new BLId(active.Key.Value),
                         RawName = active.Name,
                         Amount = active.Value,
                         TimeRemaining = active.TimeRemaining,

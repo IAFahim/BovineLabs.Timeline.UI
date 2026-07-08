@@ -79,7 +79,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                     continue;
                 }
 
-                statBuffer.Add(new ClipStat { Key = s.Key.ID, Name = s.name });
+                statBuffer.Add(new ClipStat { Key = s.Key, Name = s.name });
             }
         }
 
@@ -101,7 +101,7 @@ namespace BovineLabs.Timeline.UI.Authoring
 
                 intBuffer.Add(new ClipIntrinsic
                 {
-                    Key = i.Key.ID, Name = i.name,
+                    Key = i.Key, Name = i.name,
                     Min = i.Range.x, Max = i.Range.y,
                     MinStat = i.MinStat, MaxStat = i.MaxStat
                 });
@@ -125,7 +125,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 }
 
                 evBuffer.Add(new ClipEvent
-                    { Key = new ConditionKey(e.Event.Key), Name = e.Event.name, Duration = e.DisplayDuration });
+                    { Key = (ConditionKey)e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
             }
         }
     }
