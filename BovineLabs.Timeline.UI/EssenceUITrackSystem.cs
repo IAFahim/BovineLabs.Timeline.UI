@@ -1,7 +1,8 @@
+using BovineLabs.Core;
 using BovineLabs.Anchor;
 using BovineLabs.Core.Extensions;
 using BovineLabs.Core.Iterators;
-using BovineLabs.Core.ObjectManagement;
+using BovineLabs.Nerve.ObjectManagement;
 using BovineLabs.Essence.Data;
 using BovineLabs.Reaction.Data.Conditions;
 using BovineLabs.Reaction.Data.Core;
@@ -165,13 +166,13 @@ namespace BovineLabs.Timeline.UI
 
                 foreach (var active in activeEvents)
                 {
-                    if (ContainsEvent(eventScratch, playerIndex, new BLId(active.Key.Value)))
+                    if (ContainsEvent(eventScratch, playerIndex, active.Key.Value))
                         continue;
 
                     eventScratch.Add(new EssenceUIViewModel.Data.EventRow
                     {
                         Player = playerIndex,
-                        Key = new BLId(active.Key.Value),
+                        Key = active.Key.Value,
                         RawName = active.Name,
                         Amount = active.Value,
                         TimeRemaining = active.TimeRemaining,
@@ -197,13 +198,13 @@ namespace BovineLabs.Timeline.UI
                 if (!statMap.TryGetValue(clipStat.Key, out var stat))
                     continue;
 
-                if (ContainsStat(scratch, playerIndex, new BLId(clipStat.Key.Value)))
+                if (ContainsStat(scratch, playerIndex, clipStat.Key.Value))
                     continue;
 
                 scratch.Add(new EssenceUIViewModel.Data.StatRow
                 {
                     Player = playerIndex,
-                    Key = new BLId(clipStat.Key.Value),
+                    Key = clipStat.Key.Value,
                     RawName = clipStat.Name,
                     Added = stat.Added,
                     Multi = stat.Multi,
@@ -221,7 +222,7 @@ namespace BovineLabs.Timeline.UI
             var statMap = hasStats ? stats.AsMap() : default;
             foreach (var clipIntrinsic in clipIntrinsics)
             {
-                if (ContainsIntrinsic(scratch, playerIndex, new BLId(clipIntrinsic.Key.Value)))
+                if (ContainsIntrinsic(scratch, playerIndex, clipIntrinsic.Key.Value))
                     continue;
 
                 var current = intrinsicMap.TryGetValue(clipIntrinsic.Key, out var value) ? value : 0;
@@ -235,7 +236,7 @@ namespace BovineLabs.Timeline.UI
                 scratch.Add(new EssenceUIViewModel.Data.IntrinsicRow
                 {
                     Player = playerIndex,
-                    Key = new BLId(clipIntrinsic.Key.Value),
+                    Key = clipIntrinsic.Key.Value,
                     RawName = clipIntrinsic.Name,
                     Current = current,
                     Min = min,
@@ -247,7 +248,7 @@ namespace BovineLabs.Timeline.UI
         private static bool TryResolveStat(
             in DynamicHashMap<StatKey, StatValue> statMap, bool hasStats, StatKey key, out float value)
         {
-            if (hasStats && !key.Value.IsNull() && statMap.TryGetValue(key, out var stat))
+            if (hasStats && !key.Value.IsNull && statMap.TryGetValue(key, out var stat))
             {
                 value = stat.Value;
                 return true;

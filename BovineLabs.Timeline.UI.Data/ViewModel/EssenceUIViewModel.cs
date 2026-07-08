@@ -1,6 +1,7 @@
+using BovineLabs.Core;
 using System;
 using BovineLabs.Anchor;
-using BovineLabs.Core.ObjectManagement;
+using BovineLabs.Nerve.ObjectManagement;
 using Unity.Collections;
 using Unity.Properties;
 

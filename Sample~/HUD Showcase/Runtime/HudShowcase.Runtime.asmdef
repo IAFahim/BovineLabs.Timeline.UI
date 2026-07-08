@@ -11,7 +11,8 @@
         "BovineLabs.Reaction.Authoring",
         "BovineLabs.Essence.Data",
         "BovineLabs.Essence.Authoring",
-        "BovineLabs.Timeline.UI.Data"
+        "BovineLabs.Timeline.UI.Data",
+        "BovineLabs.Nerve"
     ],
     "autoReferenced": true
 }

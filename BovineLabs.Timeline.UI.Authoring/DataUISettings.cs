@@ -84,18 +84,18 @@ namespace BovineLabs.Timeline.UI.Authoring
                     if (r.Bar.ghostStat != null) baker.DependsOn(r.Bar.ghostStat);
 
                     vKind = UIValueKind.Intrinsic;
-                    vKey = (ushort)(r.Bar.current != null ? r.Bar.current.Key : 0);
+                    vKey = (ushort)(r.Bar.current != null ? r.Bar.current.Key.RawValue : 0);
                     mKind = UIValueKind.Stat;
-                    mKey = (ushort)(r.Bar.max != null ? r.Bar.max.Key : 0);
+                    mKey = (ushort)(r.Bar.max != null ? r.Bar.max.Key.RawValue : 0);
                     gMode = r.Bar.ghostMode;
                     gKey = gMode == HudGhostMode.FromStat
-                        ? (ushort)(r.Bar.ghostStat != null ? r.Bar.ghostStat.Key : 0)
-                        : (ushort)(r.Bar.ghostIntrinsic != null ? r.Bar.ghostIntrinsic.Key : 0);
+                        ? (ushort)(r.Bar.ghostStat != null ? r.Bar.ghostStat.Key.RawValue : 0)
+                        : (ushort)(r.Bar.ghostIntrinsic != null ? r.Bar.ghostIntrinsic.Key.RawValue : 0);
                     gDelay = r.Bar.ghostDelay;
                     gSpeed = r.Bar.ghostSpeed;
                     fDecay = r.Bar.flashDecay;
                     if (r.Bar.locked != null) baker.DependsOn(r.Bar.locked);
-                    lockedKey = (ushort)(r.Bar.locked != null ? r.Bar.locked.Key : 0);
+                    lockedKey = (ushort)(r.Bar.locked != null ? r.Bar.locked.Key.RawValue : 0);
                 }
                 else
                 {
@@ -189,7 +189,7 @@ namespace BovineLabs.Timeline.UI.Authoring
             _ => UIValueKind.Intrinsic, // IntrinsicSchemaObject or null
         };
 
-        private static ushort KeyOf(ConditionSchemaObject o) => o != null ? (ushort)o.Key : (ushort)0;
+        private static ushort KeyOf(ConditionSchemaObject o) => o != null ? (ushort)o.Key.RawValue : (ushort)0;
 
         private static FixedString64Bytes Clip(string s) => string.IsNullOrEmpty(s) ? default : (FixedString64Bytes)s;
 

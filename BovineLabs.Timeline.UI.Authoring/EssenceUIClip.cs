@@ -125,7 +125,7 @@ namespace BovineLabs.Timeline.UI.Authoring
                 }
 
                 evBuffer.Add(new ClipEvent
-                    { Key = (ConditionKey)e.Event.Key, Name = e.Event.name, Duration = e.DisplayDuration });
+                    { Key = new ConditionKey(e.Event.Key), Name = e.Event.name, Duration = e.DisplayDuration });
             }
         }
     }
