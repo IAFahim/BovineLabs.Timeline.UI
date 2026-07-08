@@ -10,7 +10,13 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
     [GeneratePropertyBag]
     public partial class RowsViewModel : SystemObservableObject<RowsViewModel.Data>, ILoadable
     {
-        [CreateProperty(ReadOnly = true)] public UIArray<Data.Row> Rows => Value.Rows;
+        /// <remarks>
+        /// Guarded: the debug toolbar constructs views (and reads this binding) before any track
+        /// system has called <see cref="Load"/> via UIHelper.Bind. Converting an uncreated
+        /// NativeList through MultiContainer throws (AsReadOnly NRE), so return null (empty grid)
+        /// until the container exists; PropertyChanged resyncs consumers once the system writes.
+        /// </remarks>
+        [CreateProperty(ReadOnly = true)] public UIArray<Data.Row> Rows => Value.RowsCreated ? Value.Rows : null;
 
         [CreateProperty(ReadOnly = true)] public bool IsVisible => Value.IsVisible;
 
@@ -30,6 +36,9 @@ namespace BovineLabs.Timeline.UI.Data.ViewModel
             [SystemProperty] private NativeList<Row> rows;
 
             [SystemProperty] private bool isVisible;
+
+            /// <summary>Gets a value indicating whether <see cref="rows"/> has been allocated (i.e. <see cref="Initialize"/> ran).</summary>
+            internal bool RowsCreated => this.rows.IsCreated;
 
             internal void Initialize()
             {
